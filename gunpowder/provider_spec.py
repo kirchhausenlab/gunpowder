@@ -5,6 +5,7 @@ from gunpowder.points_spec import PointsSpec
 from gunpowder.array import ArrayKey
 from gunpowder.array_spec import ArraySpec
 from .freezable import Freezable
+import time
 
 class ProviderSpec(Freezable):
     '''A collection of (possibly partial) :class:`ArraySpecs<ArraySpec>` and
@@ -51,10 +52,11 @@ class ProviderSpec(Freezable):
             Contains all points specs contained in this provider spec.
     '''
 
-    def __init__(self, array_specs=None, points_specs=None):
+    def __init__(self, array_specs=None, points_specs=None, random_seed: int = None):
 
         self.array_specs = {}
         self.points_specs = {}
+        self._random_seed = random_seed if random_seed is not None else int(time.time() * 1e6)
         self.freeze()
 
         # use __setitem__ instead of copying the dicts, this ensures type tests
@@ -65,6 +67,12 @@ class ProviderSpec(Freezable):
         if points_specs is not None:
             for key, spec in points_specs.items():
                 self[key] = spec
+
+    @property
+    def random_seed(self):
+        # updates the random seed every time you access it.
+        self.__update_random_seed()
+        return self._random_seed
 
 
     def __setitem__(self, key, spec):
@@ -194,6 +202,9 @@ class ProviderSpec(Freezable):
                      for a, b in zip(lcm_voxel_size, voxel_size)))
 
         return lcm_voxel_size
+
+    def __update_random_seed(self):
+        self._random_seed = hash((self._random_seed + 1)**2)
 
     def __eq__(self, other):
 
