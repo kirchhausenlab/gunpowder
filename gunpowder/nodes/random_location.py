@@ -7,8 +7,6 @@ from scipy.spatial import KDTree
 from skimage.transform import integral_image, integrate
 from gunpowder.batch_request import BatchRequest
 from gunpowder.coordinate import Coordinate
-from gunpowder.points import Points
-from gunpowder.points_spec import PointsSpec
 from gunpowder.roi import Roi
 from .batch_filter import BatchFilter
 
@@ -394,13 +392,13 @@ class RandomLocation(BatchFilter):
                     Coordinate((1,)*len(lcm_location))
                 )
             else:
-            lcm_shift_roi_begin = (
-                lcm_location - lcm_roi_begin - lcm_roi_shape +
-                Coordinate((1,)*len(lcm_location))
-            )
-            lcm_shift_roi_shape = (
-                lcm_roi_shape + lower_boundary_correction
-            )
+                lcm_shift_roi_begin = (
+                    lcm_location - lcm_roi_begin - lcm_roi_shape +
+                    Coordinate((1,)*len(lcm_location))
+                )
+                lcm_shift_roi_shape = (
+                    lcm_roi_shape + lower_boundary_correction
+                )
             lcm_point_shift_roi = Roi(lcm_shift_roi_begin, lcm_shift_roi_shape)
             logger.debug("lcm point shift roi: %s", lcm_point_shift_roi)
 

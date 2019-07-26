@@ -1,6 +1,19 @@
 from .provider_test import ProviderTest
-from gunpowder import *
-import numpy as np
+from gunpowder import (
+    BatchProvider,
+    BatchRequest,
+    Batch,
+    Point,
+    Points,
+    PointsSpec,
+    PointsKey,
+    PointsKeys,
+    RandomLocation,
+    build,
+    Roi,
+    Coordinate,
+)
+
 
 class TestSourceRandomLocation(BatchProvider):
 
@@ -34,6 +47,7 @@ class TestSourceRandomLocation(BatchProvider):
         batch[PointsKeys.TEST_POINTS] = points
 
         return batch
+
 
 class TestRandomLocationPoints(ProviderTest):
 
