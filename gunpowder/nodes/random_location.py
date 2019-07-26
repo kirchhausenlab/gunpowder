@@ -57,9 +57,14 @@ class RandomLocation(BatchFilter):
             If ``ensure_nonempty`` is set, it defines the probability that a
             request for ``ensure_nonempty`` will contain at least one point.
             Default value is 1.0.
+
+        ensure_centered (``bool``, optional):
+
+            if ``ensure_nonempty`` is set, ``ensure_centered`` guarantees
+            that the center voxel of the roi contains a point.
     '''
 
-    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0):
+    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0, ensure_centered=None):
 
         self.min_masked = min_masked
         self.mask = mask
@@ -70,6 +75,7 @@ class RandomLocation(BatchFilter):
         self.p_nonempty = p_nonempty
         self.upstream_spec = None
         self.random_shift = None
+        self.ensure_centered = ensure_centered
 
     def setup(self):
 
@@ -379,6 +385,15 @@ class RandomLocation(BatchFilter):
 
             # get all possible starting points of lcm_roi_shape that contain
             # lcm_location
+            if self.ensure_centered:
+                lcm_shift_roi_begin = (
+                    lcm_location - lcm_roi_begin - lcm_roi_shape / 2 +
+                    Coordinate((1,)*len(lcm_location)) + lower_boundary_correction
+                )
+                lcm_shift_roi_shape = (
+                    Coordinate((1,)*len(lcm_location))
+                )
+            else:
             lcm_shift_roi_begin = (
                 lcm_location - lcm_roi_begin - lcm_roi_shape +
                 Coordinate((1,)*len(lcm_location))
