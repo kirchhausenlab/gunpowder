@@ -5,8 +5,32 @@ from copy import deepcopy
 from typing import Dict
 import logging
 import numpy as np
+import networkx as nx
 
 logger = logging.getLogger(__name__)
+
+
+class GraphPoint(Freezable):
+    '''A point with a location, as stored in :class:`Points`.
+
+    Args:
+
+        location (array-like of ``float``):
+
+            The location of this point.
+    '''
+
+    def __init__(self, point_id, parent_id, **kwargs):
+        self.point_id = point_id
+        self.parent_id = parent_id
+        self.kwargs = kwargs
+        self.freeze()
+
+    def __repr__(self):
+        return str(self.location)
+
+    def copy(self):
+        return Point(self.location)
 
 
 class PointsGraph(Points):
@@ -98,3 +122,22 @@ class PointsGraph(Points):
             merged.data.update(deepcopy(points.data))
 
         return merged
+
+    def _points_to_graph(self, points: Dict[int, GraphPoint]) -> nx.DiGraph:
+        g = nx.DiGraph()
+        for point_id, point in points.items():
+            g.add_node(
+                point_id,
+                **{},
+            )
+            if (
+                point.parent_id is not None
+                and point.parent_id != point_id
+                and point.parent_id != -1
+                and point.parent_id in points
+            ):
+                g.add_edge(point.parent_id, point_id)
+
+        # check if the temporary graph is tree like
+        assert nx.is_directed_acyclic_graph(g), "Malformed Graph!"
+        return g
