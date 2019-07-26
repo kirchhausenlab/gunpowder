@@ -1,8 +1,13 @@
 from .provider_test import ProviderTest
 from gunpowder import *
 from gunpowder.tensorflow import Train, Predict, LocalServer
+try:
+    import tensorflow
+except:
+    tensorflow = None
 import multiprocessing
 import numpy as np
+import unittest
 
 class TestTensorflowTrainSource(BatchProvider):
 
@@ -36,6 +41,7 @@ class TestTensorflowTrainSource(BatchProvider):
 
         return batch
 
+@unittest.skipUnless(tensorflow is not None, "tensorflow is not installed")
 class TestTensorflowTrain(ProviderTest):
 
     def create_meta_graph(self, meta_base):
