@@ -1,9 +1,13 @@
 from .provider_test import ProviderTest
 from gunpowder import *
 from gunpowder.keras import Train
-from tensorflow import keras
+try:
+    from tensorflow import keras
+except:
+    keras = None
 import logging
 import numpy as np
+import unittest
 
 class TestKerasTrainSource(BatchProvider):
 
@@ -38,6 +42,7 @@ class TestKerasTrainSource(BatchProvider):
 
         return batch
 
+@unittest.skipUnless(keras is not None, "tensorflow is not installed")
 class TestKerasTrain(ProviderTest):
 
     def create_model(self):
