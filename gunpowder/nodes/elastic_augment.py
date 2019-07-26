@@ -86,9 +86,11 @@ class ElasticAugment(BatchFilter):
         self.max_misalign = max_misalign
         self.subsample = subsample
         self.spatial_dims = spatial_dims
+        self.cached_transformations = {}
 
     def prepare(self, request):
-        random.seed(request.random_seed)
+        seed = request.random_seed
+        random.seed(seed)
 
         # get the voxel size
         self.voxel_size = self.__get_common_voxel_size(request)
@@ -115,13 +117,33 @@ class ElasticAugment(BatchFilter):
         master_roi_voxels = master_roi/self.voxel_size
         logger.debug("master ROI in voxels is %s"%master_roi_voxels)
 
+        # Check if we have already made a master transformation for this
+        # roi and seed
+        self.master_transformation = self.cached_transformations.get(
+            (
+                seed,
+                tuple(master_roi_voxels.get_begin()),
+                tuple(master_roi_voxels.get_end()),
+            ),
+            None,
+        )
+
         # Second, create a master transformation. This is a transformation that
         # covers all voxels of the all requested ROIs. The master transformation
         # is zero-based.
 
         # create a transformation with the size of the master ROI in voxels
-        self.master_transformation = self.__create_transformation(
-            master_roi_voxels.get_shape())
+        if self.master_transformation is None:
+            self.master_transformation = self.__create_transformation(
+                master_roi_voxels.get_shape()
+            )
+            self.cached_transformations[
+                (
+                    seed,
+                    tuple(master_roi_voxels.get_begin()),
+                    tuple(master_roi_voxels.get_end()),
+                )
+            ] = copy.deepcopy(self.master_transformation)
 
         # Third, crop out parts of the master transformation for each of the
         # smaller requested ROIs. Since these ROIs now have to align with the
