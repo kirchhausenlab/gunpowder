@@ -53,6 +53,8 @@ class RandomProvider(BatchProvider):
         for key, spec in common_spec.items():
             self.provides(key, spec)
 
+
     def provide(self, request):
+        np.random.seed(request.random_seed)
         return np.random.choice(self.get_upstream_providers(),
                                 p=self.probabilities).request_batch(request)
