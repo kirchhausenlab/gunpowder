@@ -88,6 +88,7 @@ class ElasticAugment(BatchFilter):
         self.spatial_dims = spatial_dims
 
     def prepare(self, request):
+        random.seed(request.random_seed)
 
         # get the voxel size
         self.voxel_size = self.__get_common_voxel_size(request)

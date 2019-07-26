@@ -1,4 +1,4 @@
-from random import choice
+from random import choice, seed
 import logging
 import numpy as np
 
@@ -69,6 +69,7 @@ class SpecifiedLocation(BatchFilter):
             self.updates(key, spec)
 
     def prepare(self, request):
+        seed(request.random_seed)
 
         shift_roi = None
 
