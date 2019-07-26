@@ -20,7 +20,7 @@ class GraphPoint(Freezable):
             The location of this point.
     '''
 
-    def __init__(self, point_id, parent_id, **kwargs):
+    def __init__(self, point_id, parent_id=None, **kwargs):
         self.point_id = point_id
         self.parent_id = parent_id
         self.kwargs = kwargs
@@ -127,8 +127,8 @@ class PointsGraph(Points):
         g = nx.DiGraph()
         for point_id, point in points.items():
             g.add_node(
-                point_id,
-                **{},
+                point.point_id,
+                **point.kwargs,
             )
             if (
                 point.parent_id is not None
@@ -141,3 +141,10 @@ class PointsGraph(Points):
         # check if the temporary graph is tree like
         assert nx.is_directed_acyclic_graph(g), "Malformed Graph!"
         return g
+
+    def _graph_to_points(self, graph: nx.DiGraph) -> Dict[int, GraphPoint]:
+        point_data = {}
+        for node_id, node in graph.nodes.items:
+            assert node_id == node["point_id"], "ids do not match!"
+            point_data[node_id] = GraphPoint(node_id, **node)
+        return point_data
