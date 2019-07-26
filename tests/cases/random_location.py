@@ -1,5 +1,16 @@
 from .provider_test import ProviderTest
-from gunpowder import *
+from gunpowder import (
+    ArrayKeys,
+    ArraySpec,
+    Array,
+    Roi,
+    Coordinate,
+    Batch,
+    BatchRequest,
+    BatchProvider,
+    RandomLocation,
+    build,
+)
 import numpy as np
 
 class TestSourceRandomLocation(BatchProvider):
@@ -54,4 +65,30 @@ class TestRandomLocation(ProviderTest):
                                 roi=Roi((0, 0, 0), (20, 20, 20)))
                         }))
 
-                self.assertTrue(np.sum( batch.arrays[ArrayKeys.RAW].data) > 0)
+                self.assertTrue(np.sum(batch.arrays[ArrayKeys.RAW].data) > 0)
+
+    def test_random_seed(self):
+        pipeline = TestSourceRandomLocation() + CustomRandomLocation
+
+        with build(pipeline):
+            seeded_rois = []
+            unseeded_rois = []
+            for i in range(100):
+                batch_seeded = pipeline.request_batch(
+                    BatchRequest(
+                        {ArrayKeys.RAW: ArraySpec(roi=Roi((0, 0, 0), (20, 20, 20)))},
+                        random_seed=10,
+                    )
+                )
+                seeded_rois.append(batch_seeded[ArrayKeys.RAW].spec.roi)
+                batch_unseeded = pipeline.request_batch(
+                    BatchRequest(
+                        {ArrayKeys.RAW: ArraySpec(roi=Roi((0, 0, 0), (20, 20, 20)))},
+                        random_seed=10,
+                    )
+                )
+                unseeded_rois.append(batch_unseeded[ArrayKeys.RAW].spec.roi)
+
+            self.assertEqual(len(set(seeded_rois)), 1)
+            self.assertGreater(len(set(unseeded_rois)), 1)
+
