@@ -45,7 +45,7 @@ class SpatialGraph(nx.DiGraph):
         # Handle node and edge changes
         for node in to_remove:
             cropped.remove_node(node)
-        for node_id, attrs in new_nodes:
+        for node_id, attrs in new_nodes.items():
             cropped.add_node(node_id, **attrs)
         for u, v in new_edges:
             cropped.add_edge(u, v)
@@ -103,7 +103,7 @@ class SpatialGraph(nx.DiGraph):
         for u, v in self.edges:
             u_in, v_in = u in to_keep, v in to_keep
             if u_in != v_in:
-                in_id, out_id = u, v if u_in else v, u
+                in_id, out_id = (u, v) if u_in else (v, u)
                 in_attrs, out_attrs = (self.nodes[in_id], self.nodes[out_id])
                 new_location = self._roi_intercept(
                     in_attrs["location"], out_attrs["location"], roi
@@ -113,16 +113,18 @@ class SpatialGraph(nx.DiGraph):
                     new_attrs["location"] = new_location
                     new_points[next_node_id] = new_attrs
                     new_edges.append(
-                        (in_id, next_node_id) if u_in else (next_node_id, out_id)
+                        (in_id, next_node_id) if u_in else (next_node_id, in_id)
                     )
+                    next_node_id += 1
         return new_points, new_edges
 
     def _roi_intercept(
         self, inside: np.ndarray, outside: np.ndarray, bb: Roi
     ) -> np.ndarray:
-        # Rounds down to the nearest integer since the upper
-        # bound is not contained in an Roi
+
         offset = outside - inside
+        distance = np.linalg.norm(offset)
+        direction = offset / distance
 
         bb_x = np.asarray(
             [
@@ -132,8 +134,11 @@ class SpatialGraph(nx.DiGraph):
             dtype=float,
         )
 
-        s = np.min(bb_x[np.logical_and((bb_x >= 0), (bb_x < 1))])
-        new_location = np.floor(inside + s * offset).astype(int)
+        s = np.min(bb_x[np.logical_and((bb_x >= 0), (bb_x <= 1))])
+
+        # subtract a small amount from distance to round towards "inside" rather
+        # than attempting to round down if too high and up if too low.
+        new_location = np.floor(inside + s * (distance - 0.001) * direction)
         return new_location
 
 
@@ -240,13 +245,8 @@ class GraphPoints(Points):
         else:
             cropped = self
 
-        # Shift the new roi to local space, i.e. relative to current roi
-        old_roi = cropped.spec.roi
-        relative_roi = deepcopy(roi).shift(-old_roi.get_offset())
-
         # Crop the graph representation of the point set
-        cropped_graph = cropped.graph.crop(relative_roi)
-        cropped_graph.shift_points(-relative_roi.get_offset())
+        cropped_graph = cropped.graph.crop(roi)
 
         # Override the current roi with the originally provided roi
         cropped.spec.roi = roi
@@ -305,7 +305,7 @@ class GraphPoints(Points):
 
     def _add_points(self, graph: SpatialGraph):
         for point_id, point in self.data.items():
-            loc = point.location - self.spec.roi.get_offset()
+            loc = point.location
             if isinstance(point, GraphPoint):
                 graph.add_node(point_id, location=loc, **point.kwargs)
             else:
@@ -331,6 +331,6 @@ class GraphPoints(Points):
             # point needs to modify that attribute on the graph
             loc = point_attrs.pop("location")
             point_data[point_id] = GraphPoint(
-                location=loc + self.spec.roi.get_offset(), **point_attrs
+                location=loc, **point_attrs
             )
         return point_data

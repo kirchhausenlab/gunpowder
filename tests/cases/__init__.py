@@ -8,7 +8,7 @@ from .crop import TestCrop
 from .downsample import TestDownSample
 from .dvid_source import TestDvidSource
 from .elastic_augment_points import TestElasticAugment
-from .elastic_augment_points_graph import TestElasticAugmentGraph
+from .elastic_augment_graph import TestElasticAugmentGraph
 from .hdf5_source import TestHdf5Source, TestN5Source, TestZarrSource
 from .hdf5_write import TestHdf5Write
 from .keras_train import TestKerasTrain
@@ -32,3 +32,4 @@ from .shift_augment import TestShiftAugment2D
 from .tensorflow_train import TestTensorflowTrain
 from .torch_train import TestTorchTrain
 from .zarr_write import TestZarrWrite
+from .graph_points import TestGraphPoints

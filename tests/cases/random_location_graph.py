@@ -90,16 +90,10 @@ class TestRandomLocationGraph(ProviderTest):
                     histogram[i], histogram[j], 1, msg="{}".format(histogram)
                 )
 
-    @unittest.expectedFailure
     def test_ensure_centered(self):
         # TODO: This test case fails.
         # Point 1 never seems to be selected. I think this is because the requested
         # roi would be out of bounds.
-        # I am unclear on the expected behavior here:
-        """
-        # clear bounding boxes of all provided arrays and points --
-        # RandomLocation does not have limits (offsets are ignored)
-        """  # quoted from random location node.
 
         # point 2 and 3 have very different ratios for selection.
         # Case 1: 2 is selected with a 0 percent chance of reselection
