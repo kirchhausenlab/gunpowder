@@ -93,8 +93,6 @@ class TestRandomLocationGraph(ProviderTest):
     @unittest.expectedFailure
     def test_ensure_centered(self):
         # TODO: This test case fails.
-        # Point 1 never seems to be selected. I think this is because the requested
-        # roi would be out of bounds.
 
         # point 2 and 3 have very different ratios for selection.
         # Case 1: 2 is selected with a 0 percent chance of reselection

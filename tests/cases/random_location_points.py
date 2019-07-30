@@ -102,9 +102,6 @@ class TestRandomLocationPoints(ProviderTest):
     @unittest.expectedFailure
     def test_ensure_centered(self):
         # TODO: This test case fails.
-        # Point 1 never seems to be selected. I think this is because the requested
-        # roi would be out of bounds. Isn't the random location supposed to clear bounds?
-
         # point 2 is 3 times as likely as point 3.
         # Case 1: 2 is selected with a 0 percent chance of reselection
         # Case 2: 2 and 3 are selected with a 50 percent chance of reselection
