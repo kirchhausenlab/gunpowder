@@ -1,4 +1,5 @@
 from .points import Points, Point
+from .points_spec import PointsSpec
 from .roi import Roi
 from .coordinate import Coordinate
 
@@ -18,7 +19,7 @@ class SpatialGraph(nx.DiGraph):
     an offset, and relabelling connected components.
     """
 
-    def crop(self, roi: Roi, copy: bool = False):
+    def crop(self, roi: Roi, copy: bool = False, relabel_nodes=False):
         """
         Remove all nodes not in this roi.
         Does not shift nodes to be relative to the roi.
@@ -49,6 +50,11 @@ class SpatialGraph(nx.DiGraph):
             cropped.add_node(node_id, **attrs)
         for u, v in new_edges:
             cropped.add_edge(u, v)
+
+        cropped._relabel_connected_components()
+
+        if relabel_nodes:
+            cropped = nx.convert_node_labels_to_integers(cropped)
 
         return cropped
 
@@ -86,7 +92,7 @@ class SpatialGraph(nx.DiGraph):
 
         return combined
 
-    def shift_points(self, offset: Coordinate):
+    def shift(self, offset: Coordinate):
         for point_attrs in self.nodes.values():
             point_attrs["location"] += offset
 
@@ -124,17 +130,23 @@ class SpatialGraph(nx.DiGraph):
 
         offset = outside - inside
         distance = np.linalg.norm(offset)
+        assert not np.isclose(distance, 0), "Offset cannot be zero"
         direction = offset / distance
 
-        bb_x = np.asarray(
-            [
-                (np.asarray(bb.get_begin()) - inside) / offset,
-                (np.asarray(bb.get_end()) - inside) / offset,
-            ],
-            dtype=float,
-        )
+        # `offset` can be 0 on some but not all axes leaving a 0 in the denominator.
+        # `inside` can be on the bounding box, leaving a 0 in the numerator.
+        # `x/0` throws a division warning, `0/0` throws an invalid warning (both are fine here)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            bb_x = np.asarray(
+                [
+                    (np.asarray(bb.get_begin()) - inside) / offset,
+                    (np.asarray(bb.get_end()) - inside) / offset,
+                ],
+                dtype=float,
+            )
 
-        s = np.min(bb_x[np.logical_and((bb_x >= 0), (bb_x <= 1))])
+        with np.errstate(invalid="ignore"):
+            s = np.min(bb_x[np.logical_and((bb_x >= 0), (bb_x <= 1))])
 
         # subtract a small amount from distance to round towards "inside" rather
         # than attempting to round down if too high and up if too low.
@@ -202,7 +214,9 @@ class GraphPoints(Points):
             A spec describing the data.
     """
 
-    def __init__(self, data: Dict[int, Point], spec, edges: Tuple[int, int] = None):
+    def __init__(
+        self, data: Dict[int, Point], spec: PointsSpec, edges: Tuple[int, int] = None
+    ):
         self.spec = spec
         self.data = data
         self.edges = edges
@@ -248,10 +262,10 @@ class GraphPoints(Points):
         # Crop the graph representation of the point set
         cropped_graph = cropped.graph.crop(roi)
 
+        cropped = GraphPoints._from_graph(cropped_graph, spec=cropped.spec)
+
         # Override the current roi with the originally provided roi
         cropped.spec.roi = roi
-        # Override current data with data from cropped graph
-        cropped.data = cropped._graph_to_points(cropped_graph)
         return cropped
 
     def merge(self, points, copy_from_self=False, copy=False):
@@ -303,6 +317,15 @@ class GraphPoints(Points):
 
         return merged
 
+    def disjoint_merge(self, other):
+        """
+        merges two Point sets that contain points from different
+        sources. The Points in each set may or may not share IDs.
+        """
+        g1, g2 = self.graph, other.graph
+        g = g1.merge(g2)
+        return GraphPoints._from_graph(g)
+
     def _add_points(self, graph: SpatialGraph):
         for point_id, point in self.data.items():
             loc = point.location
@@ -330,7 +353,27 @@ class GraphPoints(Points):
             # do not deep copy location here. Modifying an attribute on the
             # point needs to modify that attribute on the graph
             loc = point_attrs.pop("location")
-            point_data[point_id] = GraphPoint(
-                location=loc, **point_attrs
-            )
+            point_data[point_id] = GraphPoint(location=loc, **point_attrs)
         return point_data
+
+    @classmethod
+    def _from_graph(cls, g: SpatialGraph, spec: PointsSpec = None):
+        points = {
+            point_id: GraphPoint(
+                point_attrs["location"],
+                **{
+                    key: value
+                    for key, value in point_attrs.items()
+                    if key != "location"
+                }
+            )
+            for point_id, point_attrs in g.nodes.items()
+        }
+        edges = list((u, v) for u, v in g.edges)
+        spec = (
+            PointsSpec(Roi(Coordinate((None,) * 3), Coordinate((None,) * 3)))
+            if spec is None
+            else spec
+        )
+        return cls(points, spec, edges)
+
