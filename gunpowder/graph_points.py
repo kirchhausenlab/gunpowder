@@ -31,6 +31,9 @@ class SpatialGraph(nx.DiGraph):
         else:
             cropped = self
 
+        if len(cropped.nodes) == 0:
+            return cropped
+
         # Group nodes based on location
         all_nodes = set(cropped.nodes.keys())
         to_keep = set(
@@ -41,7 +44,9 @@ class SpatialGraph(nx.DiGraph):
         to_remove = all_nodes - to_keep
 
         # Get new boundary nodes and edges
-        new_nodes, new_edges = self._handle_boundaries(to_keep, roi)
+        new_nodes, new_edges = self._handle_boundaries(
+            to_keep, roi, next_node_id=max(all_nodes) + 1
+        )
 
         # Handle node and edge changes
         for node in to_remove:
@@ -102,8 +107,7 @@ class SpatialGraph(nx.DiGraph):
                 self.nodes[point]["component"] = i
         return self
 
-    def _handle_boundaries(self, to_keep, roi):
-        next_node_id = max(to_keep) + 1 if len(to_keep) > 0 else 0
+    def _handle_boundaries(self, to_keep, roi, next_node_id):
         new_points = {}
         new_edges = []
         for u, v in self.edges:
@@ -150,7 +154,14 @@ class SpatialGraph(nx.DiGraph):
 
         # subtract a small amount from distance to round towards "inside" rather
         # than attempting to round down if too high and up if too low.
-        new_location = np.floor(inside + s * (distance - 0.001) * direction)
+        new_location = np.floor(inside + s * (distance - 0.5) * direction)
+        if not bb.contains(new_location):
+            raise Exception(
+                (
+                    "Roi {} does not contain point {}!\n"
+                    + "inside {}, outside: {}, distance: {}, direction: {}, s: {}"
+                ).format(bb, new_location, inside, outside, distance, direction, s)
+            )
         return new_location
 
 
@@ -264,7 +275,7 @@ class GraphPoints(Points):
 
         cropped = GraphPoints._from_graph(cropped_graph, spec=cropped.spec)
 
-        # Override the current roi with the originally provided roi
+        # Override the current roi with the original crop roi
         cropped.spec.roi = roi
         return cropped
 
@@ -338,11 +349,16 @@ class GraphPoints(Points):
     def _add_edges(self, graph: SpatialGraph):
         for u, v in self.edges:
             if u not in graph.nodes or v not in graph.nodes:
-                raise ValueError(
+                logging.warning(
                     (
                         "{} is{} in the graph, {} is{} in the graph, "
                         + "thus an edge cannot be added between them"
-                    ).format(u, u in graph.nodes, v, v in graph.nodes)
+                    ).format(
+                        u,
+                        "" if u in graph.nodes else " not",
+                        v,
+                        "" if v in graph.nodes else " not",
+                    )
                 )
             graph.add_edge(u, v)
         return graph
