@@ -124,7 +124,8 @@ class SimpleAugment(BatchFilter):
                 # due to the mirroring, points at the lower boundary of the ROI
                 # could fall on the upper one, which excludes them from the ROI
                 if not points.spec.roi.contains(syn_point.location):
-                    del points.data[loc_id]
+                    logger.warning("Removing point from point set not handled properly!")
+                    # del points.data[loc_id]
 
         # arrays & points
         for collection_type in [batch.arrays, batch.points]:

@@ -360,7 +360,9 @@ class GraphPoints(Points):
                         "" if v in graph.nodes else " not",
                     )
                 )
-            graph.add_edge(u, v)
+                raise Exception("This should never happen!")
+            else:
+                graph.add_edge(u, v)
         return graph
 
     def _graph_to_points(self, graph) -> Dict[int, GraphPoint]:
