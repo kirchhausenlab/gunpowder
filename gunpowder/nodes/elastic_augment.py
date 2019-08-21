@@ -289,7 +289,7 @@ class ElasticAugment(BatchFilter):
 
                 if projected_voxels is None:
                     logger.debug("point outside of target, skipping")
-                    del points.data[point_id]
+                    points.remove(point_id)
                     continue
 
                 # convert to world units (now in float again)
@@ -312,7 +312,7 @@ class ElasticAugment(BatchFilter):
                 # been requested upstream)
                 if not request[points_key].roi.contains(point.location):
                     logger.debug("point outside of target, skipping")
-                    del points.data[point_id]
+                    points.remove(point_id)
                     continue
 
             # restore original ROIs

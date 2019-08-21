@@ -6,8 +6,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class Points(Freezable):
-    '''A list of :class:`Points<Point>` with a specification describing the
+    """A list of :class:`Points<Point>` with a specification describing the
     data.
 
     Args:
@@ -19,7 +20,7 @@ class Points(Freezable):
         spec (:class:`PointsSpec`):
 
             A spec describing the data.
-    '''
+    """
 
     def __init__(self, data, spec):
         self.data = data
@@ -27,11 +28,14 @@ class Points(Freezable):
         self.freeze()
 
     def __repr__(self):
-        return "%s, %s"%(self.data, self.spec)
+        return "%s, %s" % (self.data, self.spec)
+
+    def remove(self, point_id: int):
+        del self.data[point_id]
 
     def crop(self, roi, copy=False):
-        '''Crop this point set to the given ROI.
-        '''
+        """Crop this point set to the given ROI.
+        """
 
         if copy:
             cropped = deepcopy(self)
@@ -39,9 +43,7 @@ class Points(Freezable):
             cropped = shallow_copy(self)
 
         cropped.data = {
-            k: v
-            for k, v in cropped.data.items()
-            if roi.contains(v.location)
+            k: v for k, v in cropped.data.items() if roi.contains(v.location)
         }
         cropped.spec.roi = roi
 
@@ -85,7 +87,9 @@ class Points(Freezable):
                 for point_id, point in merged.data.items()
                 if not points_roi.contains(point.location)
             }
-            max_point_id = max([point_id for point_id in filtered]) if len(filtered) > 0 else 0
+            max_point_id = (
+                max([point_id for point_id in filtered]) if len(filtered) > 0 else 0
+            )
             for point in points.data:
                 if point not in filtered:
                     filtered[point] = deepcopy(points.data[point])
@@ -100,7 +104,9 @@ class Points(Freezable):
                 for point_id, point in merged.data.items()
                 if not points_roi.contains(point.location)
             }
-            max_point_id = max([point_id for point_id in filtered]) if len(filtered) > 0 else 0
+            max_point_id = (
+                max([point_id for point_id in filtered]) if len(filtered) > 0 else 0
+            )
             for point in points.data:
                 if point not in filtered:
                     filtered[point] = deepcopy(points.data[point])
@@ -112,14 +118,14 @@ class Points(Freezable):
 
 
 class Point(Freezable):
-    '''A point with a location, as stored in :class:`Points`.
+    """A point with a location, as stored in :class:`Points`.
 
     Args:
 
         location (array-like of ``float``):
 
             The location of this point.
-    '''
+    """
 
     def __init__(self, location):
         self.location = np.array(location, dtype=np.float32)
@@ -131,8 +137,9 @@ class Point(Freezable):
     def copy(self):
         return Point(self.location)
 
+
 class PointsKey(Freezable):
-    '''A key to identify lists of points in requests, batches, and across
+    """A key to identify lists of points in requests, batches, and across
     nodes.
 
     Used as key in :class:`BatchRequest` and :class:`Batch` to retrieve specs
@@ -147,7 +154,7 @@ class PointsKey(Freezable):
             Should be upper case (like ``CENTER_POINTS``). The identifier is
             unique: Two points keys with the same identifier will refer to the
             same points.
-    '''
+    """
 
     def __init__(self, identifier):
         self.identifier = identifier
@@ -157,7 +164,7 @@ class PointsKey(Freezable):
         setattr(PointsKeys, self.identifier, self)
 
     def __eq__(self, other):
-        return hasattr(other, 'identifier') and self.identifier == other.identifier
+        return hasattr(other, "identifier") and self.identifier == other.identifier
 
     def __hash__(self):
         return self.hash
@@ -165,8 +172,9 @@ class PointsKey(Freezable):
     def __repr__(self):
         return self.identifier
 
+
 class PointsKeys:
-    '''Convenience access to all created :class:`PointsKey`s. A key generated
+    """Convenience access to all created :class:`PointsKey`s. A key generated
     with::
 
         centers = PointsKey('CENTER_POINTS')
@@ -174,5 +182,6 @@ class PointsKeys:
     can be retrieved as::
 
         PointsKeys.CENTER_POINTS
-    '''
+    """
+
     pass
