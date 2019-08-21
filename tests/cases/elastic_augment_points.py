@@ -1,11 +1,30 @@
-import unittest
-from gunpowder import *
-from gunpowder.points import PointsKeys, Points, Point
+from gunpowder import (
+    BatchProvider,
+    Batch,
+    BatchRequest,
+    PointsSpec,
+    PointsKeys,
+    PointsKey,
+    Points,
+    Point,
+    ArraySpec,
+    ArrayKeys,
+    ArrayKey,
+    Array,
+    Roi,
+    Coordinate,
+    ElasticAugment,
+    RasterizePoints,
+    RasterizationSettings,
+    Snapshot,
+    build
+)
 from .provider_test import ProviderTest
 
 import numpy as np
 import math
-from random import randint
+import time
+
 
 class PointTestSource3D(BatchProvider):
 
@@ -55,7 +74,73 @@ class PointTestSource3D(BatchProvider):
         roi_voxel = roi_array//self.spec[ArrayKeys.TEST_LABELS].voxel_size
 
         data = np.zeros(roi_voxel.get_shape(), dtype=np.uint32)
-        data[:,::2] = 100
+        data[:, ::2] = 100
+
+        for i, point in self.points.items():
+            loc = self.point_to_voxel(roi_array, point.location)
+            data[loc] = i
+
+        spec = self.spec[ArrayKeys.TEST_LABELS].copy()
+        spec.roi = roi_array
+        batch.arrays[ArrayKeys.TEST_LABELS] = Array(
+            data,
+            spec=spec)
+
+        points = {}
+        for i, point in self.points.items():
+            if roi_points.contains(point.location):
+                points[i] = point
+        batch.points[PointsKeys.TEST_POINTS] = Points(
+            points,
+            PointsSpec(roi=roi_points))
+
+        return batch
+
+
+class DensePointTestSource3D(BatchProvider):
+
+    def setup(self):
+
+        self.points = {
+            i: Point([(i//100) % 10 * 4, (i//10) % 10 * 4, i % 10 * 4]) for i in range(1000)
+        }
+
+        self.provides(
+            PointsKeys.TEST_POINTS,
+            PointsSpec(
+                roi=Roi((-40, -40, -40), (120, 120, 120))
+            ))
+
+        self.provides(
+            ArrayKeys.TEST_LABELS,
+            ArraySpec(
+                roi=Roi((-40, -40, -40), (120, 120, 120)),
+                voxel_size=Coordinate((4, 1, 1)),
+                interpolatable=False
+            ))
+
+    def point_to_voxel(self, array_roi, location):
+
+        # location is in world units, get it into voxels
+        location = location/self.spec[ArrayKeys.TEST_LABELS].voxel_size
+
+        # shift location relative to beginning of array roi
+        location -= array_roi.get_begin()/self.spec[ArrayKeys.TEST_LABELS].voxel_size
+
+        return tuple(
+            slice(int(l-2), int(l+3))
+            for l in location)
+
+    def provide(self, request):
+
+        batch = Batch()
+
+        roi_points = request[PointsKeys.TEST_POINTS].roi
+        roi_array = request[ArrayKeys.TEST_LABELS].roi
+        roi_voxel = roi_array//self.spec[ArrayKeys.TEST_LABELS].voxel_size
+
+        data = np.zeros(roi_voxel.get_shape(), dtype=np.uint32)
+        data[:, ::2] = 100
 
         for i, point in self.points.items():
             loc = self.point_to_voxel(roi_array, point.location)
@@ -93,9 +178,7 @@ class TestElasticAugment(ProviderTest):
                 [10, 10, 10],
                 [0.1, 0.1, 0.1],
                 # [0, 0, 0], # no jitter
-                [0, 2.0*math.pi]) + # rotate randomly
-                # [math.pi/4, math.pi/4]) + # rotate by 45 deg
-                # [0, 0]) + # no rotation
+                [0, 2.0*math.pi]) +
             RasterizePoints(
                 test_points,
                 test_raster,
@@ -158,9 +241,7 @@ class TestElasticAugment(ProviderTest):
                 [10, 10, 10],
                 [0.1, 0.1, 0.1],
                 # [0, 0, 0], # no jitter
-                [0, 2.0*math.pi]) + # rotate randomly
-                # [math.pi/4, math.pi/4]) + # rotate by 45 deg
-                # [0, 0]) + # no rotation
+                [0, 2.0*math.pi]) +
             RasterizePoints(
                 test_points,
                 test_raster,
@@ -219,3 +300,101 @@ class TestElasticAugment(ProviderTest):
 
         for point_data in zip(*batch_points):
             self.assertEqual(len(set(point_data)), 1)
+
+    def test_fast_transform(self):
+
+        test_labels = ArrayKey('TEST_LABELS')
+        test_points = PointsKey('TEST_POINTS')
+        test_raster = ArrayKey('TEST_RASTER')
+
+        fast_pipeline = (
+
+            DensePointTestSource3D() +
+            ElasticAugment(
+                [10, 10, 10],
+                [0.1, 0.1, 0.1],
+                [0, 2.0*math.pi],
+                use_fast_points_transform=True) +
+            RasterizePoints(
+                test_points,
+                test_raster,
+                settings=RasterizationSettings(
+                    radius=2,
+                    mode='peak'))
+        )
+
+        reference_pipeline = (
+
+            DensePointTestSource3D() +
+            ElasticAugment(
+                [10, 10, 10],
+                [0.1, 0.1, 0.1],
+                [0, 2.0*math.pi]) +
+            RasterizePoints(
+                test_points,
+                test_raster,
+                settings=RasterizationSettings(
+                    radius=2,
+                    mode='peak'))
+        )
+
+        timings = []
+        for i in range(5):
+            points_fast = {}
+            points_reference = {}
+            # seed chosen specifically to make this test fail
+            seed = i + 15
+            with build(fast_pipeline):
+
+                request_roi = Roi(
+                    (0, 0, 0),
+                    (40, 40, 40))
+
+                request = BatchRequest(random_seed=seed)
+                request[test_labels] = ArraySpec(roi=request_roi)
+                request[test_points] = PointsSpec(roi=request_roi)
+                request[test_raster] = ArraySpec(roi=request_roi)
+
+                t1_fast = time.time()
+                batch = fast_pipeline.request_batch(request)
+                t2_fast = time.time()
+                points_fast = batch[test_points].data
+
+            with build(reference_pipeline):
+
+                request_roi = Roi(
+                    (0, 0, 0),
+                    (40, 40, 40))
+
+                request = BatchRequest(random_seed=seed)
+                request[test_labels] = ArraySpec(roi=request_roi)
+                request[test_points] = PointsSpec(roi=request_roi)
+                request[test_raster] = ArraySpec(roi=request_roi)
+
+                t1_ref = time.time()
+                batch = reference_pipeline.request_batch(request)
+                t2_ref = time.time()
+                points_reference = batch[test_points].data
+
+            timings.append((t2_fast-t1_fast, t2_ref-t1_ref))
+            diffs = []
+            missing = 0
+            for point_id, point in points_reference.items():
+                if point_id not in points_fast:
+                    print("{} at {}".format(point_id, point.location))
+                    missing += 1
+                    continue
+                diff = point.location - points_fast[point_id].location
+                diffs.append(tuple(diff))
+                self.assertAlmostEqual(
+                    np.linalg.norm(diff),
+                    0,
+                    delta=1,
+                    msg="fast transform returned location {} but expected {} for point {}".format(
+                        point.location, points_fast[point_id].location, point_id
+                    ),
+                )
+
+            t_fast, t_ref = [np.mean(x) for x in zip(*timings)]
+            self.assertLess(t_fast, t_ref)
+            self.assertEqual(missing, 0)
