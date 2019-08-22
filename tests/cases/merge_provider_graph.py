@@ -4,6 +4,8 @@ from gunpowder import (
     ArraySpec,
     Array,
     PointsSpec,
+    PointsKeys,
+    PointsKey,
     Roi,
     Coordinate,
     Batch,
@@ -13,34 +15,30 @@ from gunpowder import (
     RandomLocation,
     build,
 )
-from gunpowder.points import PointsKeys, Points, PointsKey
+from gunpowder.graph_points import GraphPoints as Points
 
 import numpy as np
 
 
 class PointTestSource(BatchProvider):
-
     def __init__(self, voxel_size):
         self.voxel_size = voxel_size
 
     def setup(self):
 
         self.provides(
-            PointsKeys.PRESYN,
-            PointsSpec(roi=Roi((0, 0, 0), (100, 100, 100))))
+            PointsKeys.PRESYN, PointsSpec(roi=Roi((0, 0, 0), (100, 100, 100)))
+        )
 
     def provide(self, request):
         batch = Batch()
         roi_points = request[PointsKeys.PRESYN].roi
 
-        batch.points[PointsKeys.PRESYN] = Points(
-            {},
-            PointsSpec(roi=roi_points))
+        batch.points[PointsKeys.PRESYN] = Points({}, PointsSpec(roi=roi_points))
         return batch
 
 
 class ArrayTestSoure(BatchProvider):
-
     def __init__(self, voxel_size):
         self.voxel_size = voxel_size
 
@@ -48,29 +46,25 @@ class ArrayTestSoure(BatchProvider):
 
         self.provides(
             ArrayKeys.GT_LABELS,
-            ArraySpec(
-                roi=Roi((0, 0, 0), (100, 100, 100)),
-                voxel_size=self.voxel_size))
+            ArraySpec(roi=Roi((0, 0, 0), (100, 100, 100)), voxel_size=self.voxel_size),
+        )
 
     def provide(self, request):
         roi_array = request[ArrayKeys.GT_LABELS].roi
         data = np.zeros(
-            roi_array.get_shape() /
-            self.spec[ArrayKeys.GT_LABELS].voxel_size)
+            roi_array.get_shape() / self.spec[ArrayKeys.GT_LABELS].voxel_size
+        )
         batch = Batch()
         spec = self.spec[ArrayKeys.GT_LABELS].copy()
         spec.roi = roi_array
-        batch.arrays[ArrayKeys.GT_LABELS] = Array(
-            data,
-            spec)
+        batch.arrays[ArrayKeys.GT_LABELS] = Array(data, spec)
         return batch
 
 
-class TestMergeProvider(unittest.TestCase):
-
+class TestMergeProviderGraph(unittest.TestCase):
     def test_merge_basics(self):
         voxel_size = (1, 1, 1)
-        PointsKey('PRESYN')
+        PointsKey("PRESYN")
         pointssource = PointTestSource(voxel_size)
         arraysource = ArrayTestSoure(voxel_size)
         pipeline = (pointssource, arraysource) + MergeProvider() + RandomLocation()

@@ -9,6 +9,7 @@ from .batch_request import BatchRequest
 from .build import build
 from .coordinate import Coordinate
 from .points import Points, Point, PointsKey, PointsKeys
+from .graph_points import GraphPoint, GraphPoints, SpatialGraph
 from .points_spec import PointsSpec
 from .producer_pool import ProducerPool
 from .provider_spec import ProviderSpec

@@ -44,6 +44,10 @@ class Array(Freezable):
                 assert spec.voxel_size[d]*data.shape[-spec.roi.dims()+d] == spec.roi.get_shape()[d], \
                         "ROI %s does not align with voxel size %s * data shape %s"%(spec.roi, spec.voxel_size, data.shape)
 
+        if spec.dtype is not None:
+            assert data.dtype == spec.dtype, \
+                "data dtype %s does not match spec dtype %s" % (data.dtype, spec.dtype)
+
         self.freeze()
 
     def crop(self, roi, copy=False):

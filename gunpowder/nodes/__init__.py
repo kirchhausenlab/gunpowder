@@ -4,6 +4,7 @@ from .add_affinities import AddAffinities
 from .balance_labels import BalanceLabels
 from .batch_filter import BatchFilter
 from .batch_provider import BatchProvider
+from .copy import Copy
 from .crop import Crop
 from .csv_points_source import CsvPointsSource
 from .daisy_request_blocks import DaisyRequestBlocks

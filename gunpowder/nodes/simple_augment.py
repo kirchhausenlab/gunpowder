@@ -35,6 +35,7 @@ class SimpleAugment(BatchFilter):
 
     def setup(self):
 
+        logger.debug("total roi: {}".format(self.spec.get_total_roi()))
         self.dims = self.spec.get_total_roi().dims()
 
         # mirror_mask and transpose_dims refer to the indices of the spatial
@@ -124,7 +125,8 @@ class SimpleAugment(BatchFilter):
                 # due to the mirroring, points at the lower boundary of the ROI
                 # could fall on the upper one, which excludes them from the ROI
                 if not points.spec.roi.contains(syn_point.location):
-                    del points.data[loc_id]
+                    points.remove(loc_id)
+                    # del points.data[loc_id]
 
         # arrays & points
         for collection_type in [batch.arrays, batch.points]:

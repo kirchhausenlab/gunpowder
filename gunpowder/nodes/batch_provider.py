@@ -276,6 +276,12 @@ class BatchProvider(object):
                         data_shape*voxel_size,
                         self.name()
                 )
+            if request_spec.dtype is not None:
+                assert batch[array_key].data.dtype == request_spec.dtype, \
+                    "dtype of array %s (%s) does not match requested dtype %s" % (
+                        array_key,
+                        batch[array_key].data.dtype,
+                        request_spec.dtype)
 
         for (points_key, request_spec) in request.points_specs.items():
 

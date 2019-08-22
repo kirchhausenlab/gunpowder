@@ -4,7 +4,7 @@ from gunpowder import (
     BatchProvider,
     BatchRequest,
     Batch,
-    Point,
+    GraphPoint as Point,
     Points,
     PointsSpec,
     PointsKey,
@@ -17,23 +17,16 @@ from gunpowder import (
 
 
 class TestSourceRandomLocation(BatchProvider):
-
     def __init__(self):
 
         self.points = Points(
-            {
-                1: Point([1, 1, 1]),
-                2: Point([500, 500, 500]),
-                3: Point([550, 550, 550]),
-            },
-            PointsSpec(
-                roi=Roi((0, 0, 0), (1000, 1000, 1000))))
+            {1: Point([1, 1, 1]), 2: Point([500, 500, 500]), 3: Point([550, 550, 550])},
+            PointsSpec(roi=Roi((0, 0, 0), (1000, 1000, 1000))),
+        )
 
     def setup(self):
 
-        self.provides(
-            PointsKeys.TEST_POINTS,
-            self.points.spec)
+        self.provides(PointsKeys.TEST_POINTS, self.points.spec)
 
     def provide(self, request):
 
@@ -50,15 +43,13 @@ class TestSourceRandomLocation(BatchProvider):
         return batch
 
 
-class TestRandomLocationPoints(ProviderTest):
-
+class TestRandomLocationGraph(ProviderTest):
     def test_output(self):
 
-        PointsKey('TEST_POINTS')
+        PointsKey("TEST_POINTS")
 
-        pipeline = (
-            TestSourceRandomLocation() +
-            RandomLocation(ensure_nonempty=PointsKeys.TEST_POINTS)
+        pipeline = TestSourceRandomLocation() + RandomLocation(
+            ensure_nonempty=PointsKeys.TEST_POINTS
         )
 
         # count the number of times we get each point
@@ -71,8 +62,11 @@ class TestRandomLocationPoints(ProviderTest):
                     BatchRequest(
                         {
                             PointsKeys.TEST_POINTS: PointsSpec(
-                                roi=Roi((0, 0, 0), (100, 100, 100)))
-                        }))
+                                roi=Roi((0, 0, 0), (100, 100, 100))
+                            )
+                        }
+                    )
+                )
 
                 points = batch[PointsKeys.TEST_POINTS].data
 
@@ -87,22 +81,20 @@ class TestRandomLocationPoints(ProviderTest):
 
         total = sum(histogram.values())
         for k, v in histogram.items():
-            histogram[k] = float(v)/total
+            histogram[k] = float(v) / total
 
         # we should get roughly the same count for each point
         for i in histogram.keys():
             for j in histogram.keys():
                 self.assertAlmostEqual(
-                    histogram[i],
-                    histogram[j],
-                    1,
-                    msg="{}".format(histogram),
+                    histogram[i], histogram[j], 1, msg="{}".format(histogram)
                 )
 
     @unittest.expectedFailure
     def test_ensure_centered(self):
         # TODO: This test case fails.
-        # point 2 is 3 times as likely as point 3.
+
+        # point 2 and 3 have very different ratios for selection.
         # Case 1: 2 is selected with a 0 percent chance of reselection
         # Case 2: 2 and 3 are selected with a 50 percent chance of reselection
         # thus we get 2 is 3 times as likely as 3.
@@ -133,7 +125,7 @@ class TestRandomLocationPoints(ProviderTest):
 
                 self.assertIn(
                     Coordinate((50, 50, 50)),
-                    [Coordinate(point.location) for point in points.values()]
+                    [Coordinate(point.location) for point in points.values()],
                 )
 
                 self.assertTrue(len(points) > 0)
@@ -152,4 +144,6 @@ class TestRandomLocationPoints(ProviderTest):
         # we should get roughly the same count for each point
         for i in histogram.keys():
             for j in histogram.keys():
-                self.assertAlmostEqual(histogram[i], histogram[j], 1)
+                self.assertAlmostEqual(
+                    histogram[i], histogram[j], 1, msg="{}".format(histogram)
+                )
