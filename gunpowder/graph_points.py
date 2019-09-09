@@ -333,7 +333,6 @@ class GraphPoints(Points):
         pres = g.predecessors(point_id)
         posts = g.successors(point_id)
         g.remove_node(point_id)
-        assert len(pres) <= 1, "More than 1 parent!!!"
         for pre in pres:
             for post in posts:
                 g.add_edge(pre, post)

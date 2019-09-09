@@ -62,7 +62,7 @@ class RandomLocation(BatchFilter):
             that the center voxel of the roi contains a point.
     '''
 
-    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0, ensure_centered=None):
+    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0, ensure_centered=None, balance_points = True):
 
         self.min_masked = min_masked
         self.mask = mask
@@ -74,6 +74,7 @@ class RandomLocation(BatchFilter):
         self.upstream_spec = None
         self.random_shift = None
         self.ensure_centered = ensure_centered
+        self.balance_points = balance_points
 
     def setup(self):
 
@@ -422,7 +423,7 @@ class RandomLocation(BatchFilter):
             #
             # This is to compensate the bias introduced by close-by points.
             accept = random() <= 1.0/num_points
-            if accept:
+            if accept or not self.balance_points:
                 return random_shift
 
     def __select_random_location(self, lcm_shift_roi, lcm_voxel_size):

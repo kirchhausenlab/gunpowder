@@ -433,7 +433,7 @@ class ElasticAugment(BatchFilter):
             else:
                 missing_points.append(point_id)
         logging.warning(
-            "{} points lost in fast points projection".format(len(missing_points))
+            "{} of {} points lost in fast points projection".format(len(missing_points), len(ids))
         )
 
         return missing_points

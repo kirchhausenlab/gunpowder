@@ -108,6 +108,7 @@ class BatchFilter(BatchProvider):
         return self._autoskip_enabled
 
     def provide(self, request):
+        logging.debug("{} started processing".format(self.name()))
 
         skip = self.__can_skip(request)
 
@@ -147,6 +148,8 @@ class BatchFilter(BatchProvider):
 
         batch.profiling_stats.add(timing_prepare)
         batch.profiling_stats.add(timing_process)
+
+        logging.debug("{} finished processing".format(self.name()))
 
         return batch
 

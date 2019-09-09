@@ -61,3 +61,4 @@ class Normalize(BatchFilter):
 
         logger.debug("scaling %s with %f", self.array, factor)
         array.data = array.data.astype(self.dtype)*factor
+        array.spec.dtype = self.dtype
