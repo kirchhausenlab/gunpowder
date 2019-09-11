@@ -11,6 +11,8 @@ from gunpowder.coordinate import Coordinate
 from gunpowder.ext import augment
 from gunpowder.roi import Roi
 
+from gunpowder.graph_points import GraphPoints
+
 logger = logging.getLogger(__name__)
 
 
@@ -269,10 +271,13 @@ class ElasticAugment(BatchFilter):
 
         for (points_key, points) in batch.points.items():
 
+            point_data = points.data
+
             if self.use_fast_points_transform:
                 missing_points = self.__fast_point_projection(
                     self.transformations[points_key],
-                    points,
+                    point_data,
+                    points.spec.roi,
                     target_roi=self.target_rois[points_key],
                 )
                 if not self.recompute_missing_points:
@@ -280,10 +285,10 @@ class ElasticAugment(BatchFilter):
                         points.remove(point_id)
                     missing_points = []
             else:
-                missing_points = list(points.data.keys())
+                missing_points = list(point_data.keys())
 
             for point_id in missing_points:
-                point = points.data[point_id]
+                point = point_data[point_id]
                 # logger.debug("projecting %s", point.location)
 
                 # get location relative to beginning of upstream ROI
@@ -331,6 +336,9 @@ class ElasticAugment(BatchFilter):
                     # logger.debug("point outside of target, skipping")
                     points.remove(point_id)
                     continue
+
+            if isinstance(points, GraphPoints):
+                points._update_graph(point_data)
 
             # restore original ROIs
             points.spec.roi = request[points_key].roi
@@ -382,21 +390,23 @@ class ElasticAugment(BatchFilter):
 
         return transformation
 
-    def __fast_point_projection(self, transformation, points, target_roi):
+    def __fast_point_projection(
+        self, transformation, point_data, source_roi, target_roi
+    ):
         # rasterize the points into an array
         ids, locs = zip(
             *[
                 (
                     point_id,
-                    (np.round(point.location).astype(int) - points.spec.roi.get_begin())
+                    (np.round(point.location).astype(int) - source_roi.get_begin())
                     // self.voxel_size,
                 )
-                for point_id, point in points.data.items()
+                for point_id, point in point_data.items()
             ]
         )
         ids, locs = np.array(ids), tuple(zip(*locs))
         points_array = np.zeros(
-            points.spec.roi.get_shape() / self.voxel_size, dtype=np.int64
+            source_roi.get_shape() / self.voxel_size, dtype=np.int64
         )
         points_array[locs] = ids
 
@@ -422,7 +432,7 @@ class ElasticAugment(BatchFilter):
             for loc in projected_locs
         ]
         for point_id, proj_loc in zip(ids, projected_locs):
-            point = points.data[point_id]
+            point = point_data[point_id]
             if not any([np.isnan(x) for x in proj_loc]):
                 assert (
                     len(proj_loc) == self.spatial_dims
@@ -433,7 +443,9 @@ class ElasticAugment(BatchFilter):
             else:
                 missing_points.append(point_id)
         logging.warning(
-            "{} of {} points lost in fast points projection".format(len(missing_points), len(ids))
+            "{} of {} points lost in fast points projection".format(
+                len(missing_points), len(ids)
+            )
         )
 
         return missing_points

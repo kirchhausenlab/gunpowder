@@ -1,13 +1,15 @@
 import math
 import logging
 from random import random, randint, choice, seed
+import itertools
 
 import numpy as np
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree as KDTree
 from skimage.transform import integral_image, integrate
 from gunpowder.batch_request import BatchRequest
 from gunpowder.coordinate import Coordinate
 from gunpowder.roi import Roi
+from gunpowder.graph_points import GraphPoints
 from .batch_filter import BatchFilter
 
 logger = logging.getLogger(__name__)
@@ -62,7 +64,14 @@ class RandomLocation(BatchFilter):
             that the center voxel of the roi contains a point.
     '''
 
-    def __init__(self, min_masked=0, mask=None, ensure_nonempty=None, p_nonempty=1.0, ensure_centered=None, balance_points = True):
+    def __init__(
+        self,
+        min_masked=0,
+        mask=None,
+        ensure_nonempty=None,
+        p_nonempty=1.0,
+        ensure_centered=None,
+    ):
 
         self.min_masked = min_masked
         self.mask = mask
@@ -121,6 +130,13 @@ class RandomLocation(BatchFilter):
                 p.location
                 for p in points_batch[self.ensure_nonempty].data.values()])
 
+            point_counts = self.points.query_ball_point(
+                [p.location for p in points_batch[self.ensure_nonempty].data.values()],
+                r=self.balance_radius,
+            )
+            weights = [1 / len(point_count) for point_count in point_counts]
+            self.cumulative_weights = itertools.accumulate(weights)
+
             logger.info("retrieved %d points", len(self.points.data))
 
         # clear bounding boxes of all provided arrays and points --
@@ -167,8 +183,11 @@ class RandomLocation(BatchFilter):
 
         # change shift point locations to lie within roi
         for points_key in request.points_specs.keys():
-            for point_id, _ in batch.points[points_key].data.items():
-                batch.points[points_key].data[point_id].location -= self.random_shift
+            point_data = batch.points[points_key].data
+            for point_id, _ in point_data.items():
+                point_data[point_id].location -= self.random_shift
+            if isinstance(batch.points[points_key], GraphPoints):
+                batch.points[points_key]._update_graph(point_data)
 
     def accepts(self, request):
         '''Should return True if the randomly chosen location is acceptable
@@ -342,7 +361,7 @@ class RandomLocation(BatchFilter):
             #                 request.shape-1
 
             # pick a random point
-            point = choice(self.points.data)
+            point = choice(self.points.data, cum_weights=self.cumulative_weights)
 
             logger.debug("select random point at %s", point)
 
@@ -385,6 +404,7 @@ class RandomLocation(BatchFilter):
                 lcm_shift_roi_shape = (
                     Coordinate((1,)*len(lcm_location))
                 )
+                lcm_shift_roi_shape = Coordinate((1,) * len(lcm_location))
             else:
                 lcm_shift_roi_begin = (
                     lcm_location - lcm_roi_begin - lcm_roi_shape +
@@ -393,6 +413,7 @@ class RandomLocation(BatchFilter):
                 lcm_shift_roi_shape = (
                     lcm_roi_shape + lower_boundary_correction
                 )
+                lcm_shift_roi_shape = lcm_roi_shape + lower_boundary_correction
             lcm_point_shift_roi = Roi(lcm_shift_roi_begin, lcm_shift_roi_shape)
             logger.debug("lcm point shift roi: %s", lcm_point_shift_roi)
 
@@ -417,13 +438,7 @@ class RandomLocation(BatchFilter):
             assert point in points, (
                 "Requested batch to contain point %s, but got points "
                 "%s"%(point, points))
-            num_points = len(points)
 
-            # accept this shift with p=1/num_points
-            #
-            # This is to compensate the bias introduced by close-by points.
-            accept = random() <= 1.0/num_points
-            if accept or not self.balance_points:
                 return random_shift
 
     def __select_random_location(self, lcm_shift_roi, lcm_voxel_size):

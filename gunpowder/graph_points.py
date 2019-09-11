@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import networkx as nx
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +23,6 @@ class SpatialGraph(nx.DiGraph):
     def crop(self, roi: Roi, copy: bool = False, relabel_nodes=False):
         """
         Remove all nodes not in this roi.
-        Does not shift nodes to be relative to the roi.
         """
 
         # Copy self if needed
@@ -54,9 +54,52 @@ class SpatialGraph(nx.DiGraph):
         for node_id, attrs in new_nodes.items():
             cropped.add_node(node_id, **attrs)
         for u, v in new_edges:
+            if u not in cropped.nodes or v not in cropped.nodes:
+                raise Exception("Trying to add an edge between non-existant points!")
             cropped.add_edge(u, v)
 
-        cropped._relabel_connected_components()
+        if relabel_nodes:
+            cropped = nx.convert_node_labels_to_integers(cropped)
+
+        return cropped
+
+    def crop_out(self, roi: Roi, copy: bool = False, relabel_nodes=False):
+        """
+        Remove all nodes in this roi.
+        """
+
+        # Copy self if needed
+        if copy:
+            cropped = deepcopy(self)
+        else:
+            cropped = self
+
+        if len(cropped.nodes) == 0:
+            return cropped
+
+        # Group nodes based on location
+        all_nodes = set(cropped.nodes.keys())
+        to_remove = set(
+            key
+            for key in cropped.nodes.keys()
+            if roi.contains(cropped.nodes[key]["location"])
+        )
+        to_keep = all_nodes - to_remove
+
+        # Get new boundary nodes and edges
+        new_nodes, new_edges = self._handle_boundaries(
+            to_keep, roi, next_node_id=max(all_nodes) + 1
+        )
+
+        # Handle node and edge changes
+        for node in to_remove:
+            cropped.remove_node(node)
+        for node_id, attrs in new_nodes.items():
+            cropped.add_node(node_id, **attrs)
+        for u, v in new_edges:
+            if u not in cropped.nodes or v not in cropped.nodes:
+                raise Exception("Trying to add an edge between non-existant points!")
+            cropped.add_edge(u, v)
 
         if relabel_nodes:
             cropped = nx.convert_node_labels_to_integers(cropped)
@@ -66,36 +109,32 @@ class SpatialGraph(nx.DiGraph):
     def merge(self, other, copy: bool = False):
         """
         Merge this graph with another graph.
-        Each Point may recieve a new id.
-        Component attributes are recalculated for each Point.
+        Each Point will recieve a new id.
         """
-        current = deepcopy(self)
-        other = deepcopy(other)
-        to_remove = []
-        for node, node_attrs in other.nodes.items():
-            loc = node_attrs["location"]
-            if all(
-                np.isclose(
-                    current.nodes.get(node, {}).get(
-                        "location", np.array([float("inf")] * 3)
-                    ),
-                    loc,
-                )
-            ):
-                to_remove.append(node)
-        for node in to_remove:
-            other.remove_node(node)
 
-        combined = nx.disjoint_union(current, other)
-        combined = nx.convert_node_labels_to_integers(combined)
+        combined = nx.disjoint_union(self, other)
 
         # SpacialGraph does not change any of the attributes of nx.DiGraph
         # so this should be fine.
         combined.__class__ = SpatialGraph
-
-        combined = combined._relabel_connected_components()
+        combined.merge_overlapping_points()
 
         return combined
+
+    def merge_overlapping_points(self):
+        locations = {}
+        replacements = {}
+        for node_id, node_attrs in self.nodes.items():
+            loc = node_attrs["location"]
+            # convert to int to get hashable value
+            # multiply by 1000 to get higher precision than rounding
+            loc = tuple(int(x * 1000) for x in loc)
+            if loc not in locations:
+                locations[loc] = node_id
+            else:
+                replacements[node_id] = locations[loc]
+        nx.relabel_nodes(self, replacements, copy=False)
+        self.remove_edges_from(nx.selfloop_edges(self))
 
     def shift(self, offset: Coordinate):
         for point_attrs in self.nodes.values():
@@ -226,39 +265,34 @@ class GraphPoints(Points):
     """
 
     def __init__(
-        self, data: Dict[int, Point], spec: PointsSpec, edges: Tuple[int, int] = None
+        self,
+        data: Dict[int, Point],
+        spec: PointsSpec,
+        edges: Optional[List[Tuple[int, int]]] = None,
     ):
         self.spec = spec
-        self.data = data
-        self.edges = edges
+        self._graph = self._initialize_graph(data, edges)
         self.freeze()
 
     @property
     def graph(self) -> SpatialGraph:
-        """
-        Every time you want to do something with the graph, it is recalculated
-        from the data and edges attributes
-        """
-        graph = SpatialGraph()
-        self._add_points(graph)
-        self._add_edges(graph)
-        return graph
+        return self._graph
 
     @property
     def data(self) -> Dict[int, Point]:
-        return self._data
+        return self._graph_to_points()
 
-    @data.setter
-    def data(self, new_data: Dict[int, Point]):
-        self._data = new_data
-
-    @property
-    def edges(self) -> List[Tuple[int, int]]:
-        return self._edges
-
-    @edges.setter
-    def edges(self, new_edges: Optional[List[Tuple[int, int]]]):
-        self._edges = new_edges if new_edges is not None else []
+    def _initialize_graph(
+        self,
+        data: Optional[Dict[int, Point]] = None,
+        edges: Optional[List[Tuple[int, int]]] = None,
+    ):
+        self._graph = SpatialGraph()
+        if data is not None:
+            self._add_points(data)
+        if edges is not None:
+            self._add_edges(edges)
+        return self._graph
 
     def crop(self, roi: Roi, copy: bool = False):
         """
@@ -271,9 +305,7 @@ class GraphPoints(Points):
             cropped = self
 
         # Crop the graph representation of the point set
-        cropped_graph = cropped.graph.crop(roi)
-
-        cropped = GraphPoints._from_graph(cropped_graph, spec=cropped.spec)
+        cropped._graph.crop(roi)
 
         # Override the current roi with the original crop roi
         cropped.spec.roi = roi
@@ -288,16 +320,9 @@ class GraphPoints(Points):
         ``self`` (unless ``copy_from_self`` is set to ``True``).
 
         A copy will only be made if necessary or ``copy`` is set to ``True``.
-
-        TODO: Clear this up:
-        This seems to be assuming that the larger roi contains
-        a superset of the points in the smaller roi. With graphs
-        this may not be the case since cropping creates new nodes
-        on the boundaries. There are no guarantees on the IDs of
-        these new nodes, so they may coincide with node IDs from
-        the larger roi. Thus whether you update the smaller from
-        the larger or vice versa, a node will be replaced.
         """
+        if self is points or self._graph is points._graph:
+            return self
 
         self_roi = self.spec.roi
         points_roi = points.spec.roi
@@ -310,98 +335,105 @@ class GraphPoints(Points):
         if not self_roi.contains(points_roi):
             return points.merge(self, not copy_from_self, copy)
 
-        # -> here we know that self contains points
-
-        # simple case, self overwrites all of points
-        if copy_from_self:
-            return self if not copy else deepcopy(self)
-
-        # -> here we know that copy_from_self == False
+        # crop out points in roi from self, replace them with new points
+        self._graph.crop_out(points_roi)
+        merged_graph = self._graph.merge(points._graph, copy)
 
         # replace points
         if copy:
-            merged = self
-            merged.data.update(points.data)
-        else:
             merged = deepcopy(self)
-            merged.data.update(deepcopy(points.data))
+            merged._graph = deepcopy(merged_graph)
+        else:
+            merged = self
+            merged._graph = merged_graph
 
         return merged
 
-    def remove(self, point_id):
-        g = self.graph
-        pres = g.predecessors(point_id)
-        posts = g.successors(point_id)
-        g.remove_node(point_id)
-        for pre in pres:
-            for post in posts:
-                g.add_edge(pre, post)
-        self = type(self)._from_graph(g)
+    def remove(self, point_id: int):
+        if point_id in self._graph.nodes:
+            preds = self._graph.pred[point_id]
+            succs = self._graph.succ[point_id]
+            if len(preds) == 1:
+                for succ in succs:
+                    if (
+                        succ not in self._graph.nodes
+                        or list(preds.keys())[0] not in self._graph.nodes
+                    ):
+                        raise Exception(
+                            "Trying to add edges between non existant points"
+                        )
+                    self._graph.add_edge(list(preds.keys())[0], succ)
+            elif len(preds) != 0:
+                raise ValueError(
+                    "{} has parents {}! Nodes in a tree can only have 1 parent!".format(
+                        point_id, preds
+                    )
+                )
+            self._graph.remove_node(point_id)
 
     def disjoint_merge(self, other):
         """
-        merges two Point sets that contain points from different
-        sources. The Points in each set may or may not share IDs.
+        Merge two graphs from different sources. i.e. none of the nodes
+        should overwrite each other
         """
-        g1, g2 = self.graph, other.graph
+        g1, g2 = self._graph, other._graph
         g = g1.merge(g2)
         return GraphPoints._from_graph(g)
 
-    def _add_points(self, graph: SpatialGraph):
-        for point_id, point in self.data.items():
+    def _add_points(self, data: Dict[int, Point]):
+        for point_id, point in data.items():
             loc = point.location
-            if isinstance(point, GraphPoint):
-                graph.add_node(point_id, location=loc, **point.kwargs)
+            if isinstance(point, GraphPoint) and point.kwargs:
+                self._graph.add_node(
+                    point_id, location=deepcopy(loc), **deepcopy(point.kwargs)
+                )
             else:
-                graph.add_node(point_id, location=loc)
-        return graph
+                self._graph.add_node(point_id, location=deepcopy(loc))
 
-    def _add_edges(self, graph: SpatialGraph):
-        for u, v in self.edges:
-            if u not in graph.nodes or v not in graph.nodes:
+    def _add_edges(self, edges: List[Tuple[int, int]]):
+        for u, v in edges:
+            if u not in self._graph.nodes or v not in self._graph.nodes:
                 logging.warning(
                     (
                         "{} is{} in the graph, {} is{} in the graph, "
                         + "thus an edge cannot be added between them"
                     ).format(
                         u,
-                        "" if u in graph.nodes else " not",
+                        "" if u in self._graph.nodes else " not",
                         v,
-                        "" if v in graph.nodes else " not",
+                        "" if v in self._graph.nodes else " not",
                     )
                 )
-                raise Exception("This should never happen!")
+                raise Exception(
+                    "This graph does not contain a point with id {}! The edge {} is invalid".format(
+                        v if u in self._graph.nodes else u
+                    )
+                )
             else:
-                graph.add_edge(u, v)
-        return graph
+                self._graph.add_edge(u, v)
 
-    def _graph_to_points(self, graph) -> Dict[int, GraphPoint]:
+    def _graph_to_points(self) -> Dict[int, GraphPoint]:
         point_data = {}
-        for point_id, point_attrs in graph.nodes.items():
+        for point_id, point_attrs in self._graph.nodes.items():
             # do not deep copy location here. Modifying an attribute on the
             # point needs to modify that attribute on the graph
-            loc = point_attrs.pop("location")
-            point_data[point_id] = GraphPoint(location=loc, **point_attrs)
+            attrs = deepcopy(point_attrs)
+            loc = attrs.pop("location")
+            point_data[point_id] = GraphPoint(location=loc, **attrs)
         return point_data
 
-    @classmethod
-    def _from_graph(cls, g: SpatialGraph, spec: PointsSpec = None):
-        points = {
-            point_id: GraphPoint(
-                point_attrs["location"],
-                **{
-                    key: value
-                    for key, value in point_attrs.items()
-                    if key != "location"
-                }
-            )
-            for point_id, point_attrs in g.nodes.items()
-        }
-        edges = list((u, v) for u, v in g.edges)
-        spec = (
-            PointsSpec(Roi(Coordinate((None,) * 3), Coordinate((None,) * 3)))
-            if spec is None
-            else spec
-        )
-        return cls(points, spec, edges)
+    def _update_graph(self, points: Dict[int, Point]):
+        for point_id, point in points.items():
+            if point_id not in self._graph.nodes:
+                continue
+            if isinstance(point, GraphPoint):
+                self._graph.nodes[point_id].update(point.attrs)
+            elif isinstance(point, Point):
+                self._graph.nodes[point_id]["location"] = point.location
 
+    @classmethod
+    def _from_graph(cls, graph: nx.DiGraph, spec: PointsSpec):
+        x = cls({}, spec)
+        graph.__class__ = SpatialGraph
+        x._graph = graph
+        return x
