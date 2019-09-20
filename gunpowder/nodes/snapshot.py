@@ -165,7 +165,7 @@ class Snapshot(BatchFilter):
                         row.append(-1)
                         data.append(row)
                     data = np.array(data)
-                    for u, v in points.edges:
+                    for u, v in points.graph.edges:
                         data[data[:, 0] == v, -1] = u
 
                     f.create_dataset(

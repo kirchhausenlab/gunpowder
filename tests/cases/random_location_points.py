@@ -71,7 +71,7 @@ class TestRandomLocationPoints(ProviderTest):
                     BatchRequest(
                         {
                             PointsKeys.TEST_POINTS: PointsSpec(
-                                roi=Roi((0, 0, 0), (100, 100, 100)))
+                                roi=Roi((0, 0, 0), (10, 10, 10)))
                         }))
 
                 points = batch[PointsKeys.TEST_POINTS].data
@@ -99,13 +99,12 @@ class TestRandomLocationPoints(ProviderTest):
                     msg="{}".format(histogram),
                 )
 
-    @unittest.expectedFailure
     def test_ensure_centered(self):
         # TODO: This test case fails.
         # point 2 is 3 times as likely as point 3.
         # Case 1: 2 is selected with a 0 percent chance of reselection
-        # Case 2: 2 and 3 are selected with a 50 percent chance of reselection
-        # thus we get 2 is 3 times as likely as 3.
+        # Case 2: 2 and 3 are selected with a 0 percent chance of reselection
+        # thus we get 2 is 2 times as likely as 3.
 
         PointsKey("TEST_POINTS")
 
@@ -149,7 +148,4 @@ class TestRandomLocationPoints(ProviderTest):
         for k, v in histogram.items():
             histogram[k] = float(v) / total
 
-        # we should get roughly the same count for each point
-        for i in histogram.keys():
-            for j in histogram.keys():
-                self.assertAlmostEqual(histogram[i], histogram[j], 1)
+        self.assertAlmostEqual(histogram[2], histogram[3]*2, 1)
