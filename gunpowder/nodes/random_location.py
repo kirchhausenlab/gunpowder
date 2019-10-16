@@ -204,7 +204,11 @@ class RandomLocation(BatchFilter):
 
         total_shift_roi = None
 
-        for key, spec in request.items():
+        for key, spec in itertools.chain(
+            request.array_specs.items(),
+            request.points_specs.items(),
+            request.place_holders.items(),
+        ):
 
             if spec.roi is None:
                 continue
