@@ -393,6 +393,8 @@ class ElasticAugment(BatchFilter):
     def __fast_point_projection(
         self, transformation, point_data, source_roi, target_roi
     ):
+        if len(point_data) < 1:
+            return []
         # rasterize the points into an array
         ids, locs = zip(
             *[
