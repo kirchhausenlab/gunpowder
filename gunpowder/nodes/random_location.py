@@ -312,7 +312,7 @@ class RandomLocation(BatchFilter):
         self, request, lcm_shift_roi, lcm_voxel_size
     ):
 
-        request_points_roi = request[self.ensure_nonempty].roi
+        request_points_roi = request.points_specs.get(self.ensure_nonempty, request.place_holders.get(self.ensure_nonempty, None)).roi
 
         while True:
 
