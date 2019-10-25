@@ -400,7 +400,7 @@ class ElasticAugment(BatchFilter):
             *[
                 (
                     point_id,
-                    (np.round(point.location).astype(int) - source_roi.get_begin())
+                    (np.floor(point.location).astype(int) - source_roi.get_begin())
                     // self.voxel_size,
                 )
                 for point_id, point in point_data.items()
