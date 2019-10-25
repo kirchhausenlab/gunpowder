@@ -193,7 +193,10 @@ class SpatialGraph(nx.DiGraph):
 
         # subtract a small amount from distance to round towards "inside" rather
         # than attempting to round down if too high and up if too low.
-        new_location = np.floor(inside + s * (distance - 0.5) * direction)
+        new_location = np.floor(inside + s * distance * direction)
+        new_location = np.clip(
+            new_location, bb.get_begin(), bb.get_end() - Coordinate([1, 1, 1])
+        )
         if not bb.contains(new_location):
             raise Exception(
                 (
@@ -353,22 +356,10 @@ class GraphPoints(Points):
         if point_id in self._graph.nodes:
             preds = self._graph.pred[point_id]
             succs = self._graph.succ[point_id]
-            if len(preds) == 1:
+            for pred in preds:
                 for succ in succs:
-                    if (
-                        succ not in self._graph.nodes
-                        or list(preds.keys())[0] not in self._graph.nodes
-                    ):
-                        raise Exception(
-                            "Trying to add edges between non existant points"
-                        )
-                    self._graph.add_edge(list(preds.keys())[0], succ)
-            elif len(preds) != 0:
-                raise ValueError(
-                    "{} has parents {}! Nodes in a tree can only have 1 parent!".format(
-                        point_id, preds
-                    )
-                )
+                    if pred != succ:
+                        self._graph.add_edge(pred, succ)
             self._graph.remove_node(point_id)
 
     def disjoint_merge(self, other):
