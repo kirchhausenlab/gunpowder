@@ -444,7 +444,7 @@ class ElasticAugment(BatchFilter):
                 point.location[-self.spatial_dims :] = proj_loc
             else:
                 missing_points.append(point_id)
-        logging.warning(
+        logger.debug(
             "{} of {} points lost in fast points projection".format(
                 len(missing_points), len(ids)
             )

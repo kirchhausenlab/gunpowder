@@ -106,22 +106,24 @@ class SpatialGraph(nx.DiGraph):
 
         return cropped
 
-    def merge(self, other, copy: bool = False):
+    def merge(self, other):
         """
         Merge this graph with another graph.
         Each Point will recieve a new id.
         """
-
         combined = nx.disjoint_union(self, other)
 
+        # TODO: remove this, disjoint union should return a graph of type type(self)
         # SpacialGraph does not change any of the attributes of nx.DiGraph
         # so this should be fine.
         combined.__class__ = SpatialGraph
+
         combined.merge_overlapping_points()
 
         return combined
 
     def merge_overlapping_points(self):
+        # TODO: this could probably be improved by using scipy.spatial.cKDTree
         locations = {}
         replacements = {}
         for node_id, node_attrs in self.nodes.items():
