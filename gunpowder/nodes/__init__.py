@@ -40,3 +40,4 @@ from .specified_location import SpecifiedLocation
 from .stack import Stack
 from .zarr_source import ZarrSource
 from .zarr_write import ZarrWrite
+from .mongo_graph_provider import DaisyGraphProvider

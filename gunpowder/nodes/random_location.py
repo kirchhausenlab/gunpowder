@@ -125,7 +125,7 @@ class RandomLocation(BatchFilter):
             )
             points_spec = self.upstream_spec.points_specs[self.ensure_nonempty]
 
-            logger.info("requesting all %s points...", self.ensure_nonempty)
+            logger.debug("requesting all %s points...", self.ensure_nonempty)
 
             points_request = BatchRequest({self.ensure_nonempty: points_spec})
             points_batch = upstream.request_batch(points_request)
@@ -141,7 +141,7 @@ class RandomLocation(BatchFilter):
             weights = [1 / len(point_count) for point_count in point_counts]
             self.cumulative_weights = list(itertools.accumulate(weights))
 
-            logger.info("retrieved %d points", len(self.points.data))
+            logger.debug("retrieved %d points", len(self.points.data))
 
         # clear bounding boxes of all provided arrays and points --
         # RandomLocation does not have limits (offsets are ignored)
