@@ -85,8 +85,8 @@ class DaisyGraphProvider(BatchProvider):
         for key, spec in request.items():
             requested_graph = self.graph_provider.get_graph(
                 spec.roi,
-                targeting_edges=True,
-                dangling_attrs=True,
+                edge_inclusion="either",
+                node_inclusion="dangling",
                 node_attrs=self.node_attrs,
                 edge_attrs=self.edge_attrs,
             )

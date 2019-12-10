@@ -20,6 +20,7 @@ class SpatialGraph(nx.DiGraph):
     an offset, and relabelling connected components.
     """
 
+
     def crop(self, roi: Roi, copy: bool = False, relabel_nodes=False):
         """
         Remove all nodes not in this roi.
@@ -425,7 +426,8 @@ class GraphPoints(Points):
                 self._graph.nodes[point_id]["location"] = point.location
 
     @classmethod
-    def _from_graph(cls, graph: nx.DiGraph, spec: PointsSpec):
+    def _from_graph(cls, graph: nx.Graph, spec: PointsSpec):
+        graph = graph.to_directed()
         x = cls({}, spec)
         graph.__class__ = SpatialGraph
         x._graph = graph

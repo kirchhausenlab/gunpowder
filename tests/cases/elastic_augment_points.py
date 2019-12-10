@@ -24,6 +24,7 @@ from .provider_test import ProviderTest
 import numpy as np
 import math
 import time
+import unittest
 
 
 class PointTestSource3D(BatchProvider):
@@ -365,6 +366,7 @@ class TestElasticAugment(ProviderTest):
             self.assertLess(t_fast, t_ref)
             self.assertEqual(missing, 0)
 
+    @unittest.skip("Not implemented yet")
     def test_cache(self):
 
         test_labels = ArrayKey("TEST_LABELS")
