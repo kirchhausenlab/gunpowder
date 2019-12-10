@@ -30,6 +30,6 @@ from .rasterize_points import TestRasterizePoints
 from .scan import TestScan
 from .shift_augment import TestShiftAugment2D
 from .tensorflow_train import TestTensorflowTrain
-from .torch_train import TestTorchTrain
+from .torch_train import TestTorchTrain, TestTorchPredict
 from .zarr_write import TestZarrWrite
 from .graph_points import TestGraphPoints
