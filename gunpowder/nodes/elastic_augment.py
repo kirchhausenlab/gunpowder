@@ -353,12 +353,12 @@ class ElasticAugment(BatchFilter):
                         "Assuming voxel size of {} is {}. "
                         + "Note that elastic transform shouldn't work on arrays "
                         + "with different voxel sizes."
-                    ).format(array_key)
+                    ).format(array_key, voxel_size)
                 )
             assert (
                 request[array_key].voxel_size == voxel_size
-            ), "voxel size mismatch: got {} expected {}".format(
-                request[array_key].voxel_size, voxel_size
+            ), "voxel size mismatch for {}: got {} expected {}".format(
+                array_key, request[array_key].voxel_size, voxel_size
             )
         return voxel_size
 

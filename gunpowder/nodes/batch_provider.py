@@ -295,8 +295,8 @@ class BatchProvider(object):
 
             for _, point in points.data.items():
                 assert points.spec.roi.contains(point.location), (
-                    "points provided by %s with ROI %s contain point at %s"%(
-                        self.name(), points.spec.roi, point.location))
+                    "points %s provided by %s with ROI %s contain point at %s"%(
+                        points_key, self.name(), points.spec.roi, point.location))
 
     def remove_unneeded(self, batch, request):
 

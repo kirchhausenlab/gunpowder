@@ -96,9 +96,14 @@ class Snapshot(BatchFilter):
             if array_key not in request.array_specs:
                 request.array_specs[array_key] = spec
 
+        # append additional points requests, don't overwrite existing ones
+        for points_key, spec in self.additional_request.points_specs.items():
+            if points_key not in request.points_specs:
+                request.points_specs[points_key] = spec
+
     def process(self, batch, request):
 
-        if self.record_snapshot:
+        if self.record_snapshot and self.output_filename is not None:
 
             try:
                 os.makedirs(self.output_dir)
@@ -128,6 +133,7 @@ class Snapshot(BatchFilter):
                             data=array.data.astype(dtype),
                             compression=self.compression_type,
                         )
+
                     else:
                         dataset = f.create_dataset(
                             name=ds_name,
@@ -173,7 +179,7 @@ class Snapshot(BatchFilter):
                                 row.append(x)
                             row.append(-1)
                             data.append(row)
-                        
+
                     data = np.array(data)
 
                     f.create_dataset(

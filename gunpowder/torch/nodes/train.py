@@ -69,7 +69,7 @@ class Train(GenericTrain):
             loss,
             optimizer,
             inputs,
-            output,
+            outputs,
             target,
             gradients=None,
             array_specs=None,
@@ -77,12 +77,8 @@ class Train(GenericTrain):
             save_every=2000,
             log_dir=None,
             log_every=1):
-
-        outputs = {'output': output}
+            
         targets = {'output': target}
-
-        # not yet implemented
-        gradients = {}
 
         super(Train, self).__init__(
             inputs,
@@ -109,7 +105,7 @@ class Train(GenericTrain):
         else:
             self.summary_writer = None
             if log_dir is not None:
-                logger.warn("log_dir given, but tensorboardX is not installed")
+                logger.warning("log_dir given, but tensorboardX is not installed")
 
     def start(self):
 
@@ -148,15 +144,40 @@ class Train(GenericTrain):
         }
 
         self.optimizer.zero_grad()
-        outputs = {
-            'output': self.model(**device_inputs)
-        }
+        model_outputs = self.model(**device_inputs)
+        if isinstance(model_outputs, tuple):
+            outputs = {i: model_outputs[i] for i in range(len(model_outputs))}
+        elif isinstance(model_outputs, torch.Tensor):
+            outputs = {0: model_outputs}
+        else:
+            raise RuntimeError(
+                "Torch train node only supports return types of tuple",
+                f"and torch.Tensor from model.forward(). not {type(model_outputs)}",
+            )
 
-        logger.debug("model output: %s", outputs['output'])
+        logger.debug("model output: %s", outputs[0])
         logger.debug("expected output: %s", device_targets['output'])
-        loss = self.loss(outputs['output'], device_targets['output'])
+        loss = self.loss(outputs[0], device_targets['output'])
         loss.backward()
         self.optimizer.step()
+
+        for array_name, array_key in self.gradients.items():
+            logger.warning(f"adding {array_name} to {array_key}")
+            if array_key not in request:
+                continue
+            if isinstance(array_name, int):
+                tensor = outputs[array_name]
+            elif isinstance(array_name, str):
+                tensor = getattr(self.model, array_name)
+            else:
+                raise RuntimeError(
+                    "only ints and strings are supported as gradients keys"
+                )
+            spec = self.spec[array_key].copy()
+            spec.roi = request[array_key].roi
+            batch.arrays[array_key] = Array(
+                tensor.weight.grad.cpu().detach().numpy(), spec
+            )
 
         for array_key, array_name in requested_outputs.items():
             spec = self.spec[array_key].copy()

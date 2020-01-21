@@ -63,6 +63,7 @@ class GenericPredict(BatchFilter):
         self.timer_start = None
 
     def setup(self):
+        self.enable_autoskip()
 
         # get common voxel size of inputs, or None if they differ
         common_voxel_size = None

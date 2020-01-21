@@ -3,13 +3,9 @@ from gunpowder.array_spec import ArraySpec
 from gunpowder.ext import torch
 from gunpowder.nodes.generic_predict import GenericPredict
 
-from functools import reduce
-from operator import mul
-import ctypes
 import logging
-import multiprocessing as mp
-import numpy as np
 from typing import Dict, Union
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +41,11 @@ class Predict(GenericPredict):
             the voxel size of the input arrays. Only fields that are not
             ``None`` in the given :class:`ArraySpec` will be used.
 
-        checkpoint: (``string``, optional):
+        checkpoint: (``Path``, optional):
 
             An optional path to the saved parameters for your torch module.
             These will be loaded and used for prediction if provided.
-        
+
         use_gpus: (``list``, ``int``):
 
             Which gpu's to use for prediction.
@@ -62,7 +58,8 @@ class Predict(GenericPredict):
         inputs: Dict[str, ArrayKey],
         outputs: Dict[Union[str, int], ArrayKey],
         array_specs: Dict[ArrayKey, ArraySpec] = {},
-        checkpoint=None,
+        checkpoint: Path = None,
+        device: str = "cuda",
         gpus=[0],
     ):
 
@@ -71,9 +68,10 @@ class Predict(GenericPredict):
         self.model = model
         self.checkpoint = checkpoint
         self.gpus = gpus
+        self.device = device
 
         if self.checkpoint is not None:
-            self.model.load_state_dict(torch.load(self.checkpoint))
+            self.model.load_state_dict(torch.load(self.checkpoint)["model_state_dict"])
         self.intermediate_layers = {}
         self.register_hooks()
 
@@ -82,13 +80,15 @@ class Predict(GenericPredict):
 
     def predict(self, batch, request):
         inputs = self.get_inputs(batch)
-        out = self.model.forward(**inputs)
+        with torch.no_grad():
+            out = self.model.forward(**inputs)
         outputs = self.get_outputs(out)
         self.update_batch(batch, request, outputs)
 
     def get_inputs(self, batch):
+        # add the batch dimension
         model_inputs = {
-            key: torch.from_numpy(batch[value].data)
+            key: torch.as_tensor(batch[value].data, device=self.device).unsqueeze(0)
             for key, value in self.inputs.items()
         }
         return model_inputs
@@ -102,9 +102,11 @@ class Predict(GenericPredict):
     def create_hook(self, key):
         def save_layer(module, input, output):
             self.intermediate_layers[key] = output
+
         return save_layer
 
     def get_outputs(self, module_out):
+        # squeeze to remove the batch dimension
         outputs = {}
         if isinstance(module_out, tuple):
             module_outs = module_out
@@ -112,14 +114,16 @@ class Predict(GenericPredict):
             module_outs = (module_out,)
         for key, value in self.outputs.items():
             if isinstance(key, str):
-                outputs[value] = self.intermediate_layers[key].detach().numpy()
+                outputs[value] = torch.squeeze(
+                    self.intermediate_layers[key].detach(), 0
+                ).numpy()
             elif isinstance(key, int):
-                outputs[value] = module_outs[key].detach().numpy()
+                outputs[value] = torch.squeeze(module_outs[key].detach(), 0).numpy()
         return outputs
 
     def update_batch(self, batch, request, outputs):
         for key, data in outputs.items():
-            batch[key] = Array(data, spec=self.array_specs.get(key, request[key]))
+            batch[key] = Array(data, spec=request[key].copy())
 
     def stop(self):
         pass

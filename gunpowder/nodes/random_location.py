@@ -201,8 +201,11 @@ class RandomLocation(BatchFilter):
         return True
 
     def __get_possible_shifts(self, request):
+        r = Coordinate(request.get_total_roi().get_shape())
+        l = Coordinate(self.points.mins)
+        u = Coordinate(self.points.maxes)
 
-        total_shift_roi = None
+        total_shift_roi = Roi(l - r, u - l + r * 2)
 
         for key, spec in itertools.chain(
             request.array_specs.items(),
@@ -227,11 +230,11 @@ class RandomLocation(BatchFilter):
 
         logger.debug("valid shifts for request in " + str(total_shift_roi))
 
-        assert not total_shift_roi.unbounded(), (
+        assert not total_shift_roi.unbounded() or self.ensure_nonempty in request, (
             "Can not pick a random location, intersection of upstream ROIs is "
             "unbounded."
         )
-        assert total_shift_roi.size() > 0, (
+        assert total_shift_roi.size() is None or total_shift_roi.size() > 0, (
             "Can not satisfy batch request, no location covers all requested " "ROIs."
         )
 
@@ -312,7 +315,28 @@ class RandomLocation(BatchFilter):
         self, request, lcm_shift_roi, lcm_voxel_size
     ):
 
-        request_points_roi = request.points_specs.get(self.ensure_nonempty, request.place_holders.get(self.ensure_nonempty, None)).roi
+        request_points = request.points_specs.get(
+            self.ensure_nonempty, request.place_holders.get(self.ensure_nonempty, None)
+        )
+        if request_points is None:
+            # It may be the case that you want to ensure a point set is non-empty,
+            # but you don't need those points for anything. This case should Ideally be
+            # handled by the placeholders, but it may be annoying to request even those.
+            # Thus a fall back should just be to assume that the total request roi should
+            # contain a point, whether or not those points were requested. This is not
+            # best practice though, so it will come with a warning
+            total_roi = request.get_total_roi()
+            logger.warning(
+                f"Requesting non empty {self.ensure_nonempty}, however {self.ensure_nonempty} "
+                + f"has not been requested or been included as a placeholder. Falling "
+                + f"back on using the total roi of the request {total_roi} as a stand in for "
+                + f"{self.ensure_nonempty}. Best practice would be to use a placeholder "
+                + f"if you would like to guarantee non empty for a set of points, but do "
+                + f"not need those points."
+            )
+            request_points_roi = total_roi
+        else:
+            request_points_roi = request_points.roi
 
         while True:
 

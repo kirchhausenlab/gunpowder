@@ -41,6 +41,16 @@ class MergeProvider(BatchProvider):
 
             upstream_requests[provider][key] = spec
 
+        for key, spec in request.place_holders.items():
+
+            provider = self.key_to_provider[key]
+            if provider not in upstream_requests:
+                upstream_requests[provider] = BatchRequest()
+
+            upstream_requests[provider].place_holders[key] = spec
+
+
+
         # execute requests, merge batches
         merged_batch = Batch()
         for provider, upstream_request in upstream_requests.items():

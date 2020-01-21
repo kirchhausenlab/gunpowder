@@ -89,7 +89,7 @@ class Hdf5LikeSource(BatchProvider):
 
         with self._open_file(self.filename) as data_file:
             for (array_key, request_spec) in request.array_specs.items():
-                logger.debug("Reading %s in %s...", array_key, request_spec.roi)
+                logger.debug(f"Reading {array_key} for {batch.id} in {request_spec.roi}")
 
                 voxel_size = self.spec[array_key].voxel_size
 

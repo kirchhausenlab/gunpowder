@@ -20,7 +20,6 @@ class SpatialGraph(nx.DiGraph):
     an offset, and relabelling connected components.
     """
 
-
     def crop(self, roi: Roi, copy: bool = False, relabel_nodes=False):
         """
         Remove all nodes not in this roi.
@@ -125,6 +124,14 @@ class SpatialGraph(nx.DiGraph):
 
     def merge_overlapping_points(self):
         # TODO: this could probably be improved by using scipy.spatial.cKDTree
+        # not enough to just check location of a single node for overlap,
+        # multiple neurons that get close to each other might get merged.
+        # Instead, check that the neighbors overlap as well. for smaller crops,
+        # some neighbors may be cut off. So check that for any two points,
+        # they are the same if their locations match, but also that the union
+        # of the sets of neighbor locations for both nodes, is no longer than
+        # the length of the larger set of neighbor locations. i.e. they contain
+        # only neighbors that overlap, or are unseen by the potential match.
         locations = {}
         replacements = {}
         for node_id, node_attrs in self.nodes.items():
@@ -133,9 +140,37 @@ class SpatialGraph(nx.DiGraph):
             # multiply by 1000 to get higher precision than rounding
             loc = tuple(int(x * 1000) for x in loc)
             if loc not in locations:
-                locations[loc] = node_id
+                locations[loc] = {node_id: set()}
+                for pred in self.pred[node_id]:
+                    pred_loc = self.nodes[pred]["location"]
+                    pred_loc = tuple(int(x * 1000) for x in pred_loc)
+                    locations[loc][node_id].add(pred_loc)
+                for succ in self.succ[node_id]:
+                    succ_loc = self.nodes[succ]["location"]
+                    succ_loc = tuple(int(x * 1000) for x in succ_loc)
+                    locations[loc][node_id].add(succ_loc)
             else:
-                replacements[node_id] = locations[loc]
+                neighbor_locations = set()
+                for pred in self.pred[node_id]:
+                    pred_loc = self.nodes[pred]["location"]
+                    pred_loc = tuple(int(x * 1000) for x in pred_loc)
+                    neighbor_locations.add(pred_loc)
+                for succ in self.succ[node_id]:
+                    succ_loc = self.nodes[succ]["location"]
+                    succ_loc = tuple(int(x * 1000) for x in succ_loc)
+                    neighbor_locations.add(succ_loc)
+                matched = False
+                for potential_match, neighbor_locs in locations[loc].items():
+                    if len(neighbor_locs | neighbor_locations) <= max(
+                        len(neighbor_locs), len(neighbor_locations)
+                    ):
+                        replacements[node_id] = potential_match
+                        locations[loc][potential_match] = (
+                            neighbor_locs | neighbor_locations
+                        )
+                        matched = True
+                if not matched:
+                    locations[loc][node_id] = neighbor_locations
         nx.relabel_nodes(self, replacements, copy=False)
         self.remove_edges_from(nx.selfloop_edges(self))
 
@@ -343,7 +378,7 @@ class GraphPoints(Points):
 
         # crop out points in roi from self, replace them with new points
         self._graph.crop_out(points_roi)
-        merged_graph = self._graph.merge(points._graph, copy)
+        merged_graph = self._graph.merge(points._graph)
 
         # replace points
         if copy:

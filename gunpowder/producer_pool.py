@@ -62,6 +62,7 @@ class ProducerPool(object):
                     raise NoResult()
 
         if isinstance(item, Exception):
+            logger.error(item, exc_info=True)
             raise item
         return item
 
