@@ -133,6 +133,7 @@ class ProducerPool(object):
                     result = target()
                 except Exception as e:
                     result = e
+                    logger.error(e, exc_info=True)
                     traceback.print_exc()
                     # don't stop on normal exceptions -- place them in result queue 
                     # and let them be handled by caller
