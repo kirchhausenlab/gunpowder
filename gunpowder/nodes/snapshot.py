@@ -99,9 +99,9 @@ class Snapshot(BatchFilter):
 
     def prepare(self, request):
         deps = BatchRequest()
-        for key, spec in request:
+        for key, spec in request.items():
             if key in self.dataset_names:
-                deps[key] = request
+                deps[key] = spec
 
         self.record_snapshot = self.n % self.every == 0
 
