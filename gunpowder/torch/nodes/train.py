@@ -336,3 +336,7 @@ class Train(GenericTrain):
                 )
 
         return arrays
+
+    def stop(self):
+        self.summary_writer.close()
+
