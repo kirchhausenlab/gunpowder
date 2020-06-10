@@ -1,3 +1,4 @@
+
 import logging
 import numpy as np
 
@@ -124,7 +125,8 @@ class Train(GenericTrain):
         else:
             self.summary_writer = None
             if log_dir is not None:
-                logger.warning("log_dir given, but tensorboardX is not installed")
+                logger.warning(
+                    "log_dir given, but tensorboardX is not installed")
 
         self.intermediate_layers = {}
         self.register_hooks()
@@ -191,16 +193,21 @@ class Train(GenericTrain):
         logger.info("Using device %s", self.device)
 
     def train_step(self, batch, request):
+        self.iteration += 1
+        batch.iteration = self.iteration
 
         inputs = self.__collect_provided_inputs(batch)
         requested_outputs = self.__collect_requested_outputs(request)
 
         # keys are argument names of model forward pass
         device_inputs = {
-            k: torch.as_tensor(v, device=self.device) for k, v in inputs.items()
-        }
+            k: torch.as_tensor(
+                v,
+                device=self.device) for k,
+            v in inputs.items()}
 
-        # get outputs. Keys are tuple indices or model attr names as in self.outputs
+        # get outputs. Keys are tuple indices or model attr names as in
+        # self.outputs
         self.optimizer.zero_grad()
         model_outputs = self.model(**device_inputs)
         if isinstance(model_outputs, tuple):
@@ -213,6 +220,12 @@ class Train(GenericTrain):
                 f"and torch.Tensor from model.forward(). not {type(model_outputs)}",
             )
         outputs.update(self.intermediate_layers)
+
+        if self.summary_writer and batch.iteration % self.log_every == 0:
+            self.summary_writer.add_histogram(
+                'model_outputs_channel_0', model_outputs[:, 0, ...], batch.iteration)
+            self.summary_writer.add_histogram(
+                'model_outputs_channel_1', model_outputs[:, 1, ...], batch.iteration)
 
         # Some inputs to the loss should come from the batch, not the model
         provided_loss_inputs = self.__collect_provided_loss_inputs(batch)
@@ -246,16 +259,30 @@ class Train(GenericTrain):
 
         self.retain_gradients(request, outputs)
 
-        logger.debug(
-            "model outputs: %s",
-            {k: v.shape for k, v in outputs.items()})
-        logger.debug(
-            "loss inputs: %s %s",
-            [v.shape for v in device_loss_args],
-            {k: v.shape for k, v in device_loss_kwargs.items()})
+        logger.debug("model outputs: %s", outputs)
+        # logger.debug(f"loss_inputs: {device_loss_args},
+        # {device_loss_kwargs}")
+
         loss = self.loss(*device_loss_args, **device_loss_kwargs)
         loss.backward()
         self.optimizer.step()
+
+        if self.summary_writer and batch.iteration % self.log_every == 0:
+            for i, tensor in enumerate(device_loss_args):
+                self.summary_writer.add_histogram(
+                    f'loss_inputs/{i}', tensor, batch.iteration
+                )
+
+            for i, p in enumerate(self.model.parameters()):
+                self.summary_writer.add_histogram(
+                    f'weights/{i}', p, batch.iteration
+                )
+                self.summary_writer.add_scalar(
+                    f'gradients_mean/{i}', p.grad.mean(), batch.iteration
+                )
+                self.summary_writer.add_histogram(
+                    f'gradients/{i}', p.grad, batch.iteration
+                )
 
         # add requested model outputs to batch
         for array_key, array_name in requested_outputs.items():
@@ -290,8 +317,6 @@ class Train(GenericTrain):
             )
 
         batch.loss = loss.cpu().detach().numpy()
-        self.iteration += 1
-        batch.iteration = self.iteration
 
         if batch.iteration % self.save_every == 0:
 
@@ -334,11 +359,16 @@ class Train(GenericTrain):
             self.loss_inputs, batch, expect_missing_arrays=True
         )
 
-    def __collect_provided_arrays(self, reference, batch, expect_missing_arrays=False):
+    def __collect_provided_arrays(
+            self,
+            reference,
+            batch,
+            expect_missing_arrays=False):
 
         arrays = {}
 
         for array_name, array_key in reference.items():
+            logger.debug(f'{array_name=}, {array_key=}')
             if isinstance(array_key, ArrayKey):
                 msg = f"batch does not contain {array_key}, array {array_name} will not be set"
                 if array_key in batch.arrays:
