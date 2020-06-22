@@ -1,5 +1,5 @@
 import logging
-import multiprocessing
+import torch.multiprocessing as multiprocessing
 import time
 
 from gunpowder.nodes.batch_filter import BatchFilter

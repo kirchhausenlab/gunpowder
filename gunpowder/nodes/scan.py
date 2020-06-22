@@ -1,5 +1,5 @@
 import logging
-import multiprocessing
+import torch.multiprocessing as multiprocessing
 import numpy as np
 from gunpowder.array import Array
 from gunpowder.batch import Batch
@@ -266,7 +266,7 @@ class Scan(BatchFilter):
 
         while True:
 
-            logger.debug("adding %s", shift)
+            # logger.debug("adding %s", shift)
             shifts.append(Coordinate(shift))
 
             if (shift == max_shift).all():

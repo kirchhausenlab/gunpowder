@@ -3,7 +3,7 @@ try:
 except:
     import queue as Queue
 import logging
-import multiprocessing
+import torch.multiprocessing as multiprocessing
 import os
 import sys
 import time

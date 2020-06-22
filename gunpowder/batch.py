@@ -1,6 +1,6 @@
 from copy import copy as shallow_copy
 import logging
-import multiprocessing
+import torch.multiprocessing as multiprocessing
 import warnings
 
 from .freezable import Freezable
