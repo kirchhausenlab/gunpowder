@@ -161,7 +161,7 @@ class GenericTrain(BatchFilter):
 
         time_of_iteration = time.time() - start
 
-        logger.info(
+        logger.debug(
             "Train process: iteration=%d loss=%.9f time=%f",
             batch.iteration, batch.loss, time_of_iteration)
 
