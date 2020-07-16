@@ -101,8 +101,12 @@ class Predict(GenericPredict):
             f"Prediction only implemented for a single GPU."
         torch.cuda.set_device(self.gpus[0])
 
-        logger.info(f"Predicting on {'gpu' if self.use_cuda else 'cpu'}")
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
+        if self.use_cuda:
+            logger.info(f"Predicting on gpu {torch.cuda.current_device()}")
+        else:
+            logger.info("Predicting on cpu")
+
+        self.device = torch.device(f"cuda:{torch.cuda.current_device()}" if self.use_cuda else "cpu")
 
         try:
             self.model = self.model.to(self.device)
