@@ -48,7 +48,6 @@ class Predict(GenericPredict):
         gpus: (``list`` of ``int``, optional):
 
             Which gpu's to use for prediction.
-            Not yet implemented.
 
         device (``string``, optional):
 
@@ -97,6 +96,11 @@ class Predict(GenericPredict):
         self.use_cuda = (
             torch.cuda.is_available() and
             self.device_string == "cuda")
+
+        assert len(self.gpus) == 1, \
+            f"Prediction only implemented for a single GPU."
+        torch.cuda.set_device(self.gpus[0])
+
         logger.info(f"Predicting on {'gpu' if self.use_cuda else 'cpu'}")
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
 
