@@ -294,7 +294,7 @@ class Train(GenericTrain):
             spec = self.spec[array_key].copy()
             spec.roi = request[array_key].roi
             batch.arrays[array_key] = Array(
-                outputs[array_name].cpu().detach().numpy(), spec
+                outputs[array_name].detach().cpu().numpy(), spec
             )
 
         for array_name, array_key in self.gradients.items():
@@ -311,17 +311,10 @@ class Train(GenericTrain):
             spec = self.spec[array_key].copy()
             spec.roi = request[array_key].roi
             batch.arrays[array_key] = Array(
-                tensor.grad.cpu().detach().numpy(), spec
+                tensor.grad.detach().cpu().numpy(), spec
             )
 
-        for array_key, array_name in requested_outputs.items():
-            spec = self.spec[array_key].copy()
-            spec.roi = request[array_key].roi
-            batch.arrays[array_key] = Array(
-                outputs[array_name].cpu().detach().numpy(), spec
-            )
-
-        batch.loss = loss.cpu().detach().numpy()
+        batch.loss = loss.detach().cpu().numpy()
 
         if batch.iteration % self.save_every == 0:
 
