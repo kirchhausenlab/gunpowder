@@ -203,7 +203,7 @@ class Train(GenericTrain):
             k: torch.as_tensor(v).pin_memory() for k,
             v in inputs.items()}
         device_inputs = {
-            k: v.to(device=self.device) for k,
+            k: v.to(device=self.device, non_blocking=True) for k,
             v in pinned_inputs.items()}
 
         # get outputs. Keys are tuple indices or model attr names as in
@@ -236,7 +236,7 @@ class Train(GenericTrain):
         }
 
         device_loss_inputs = {
-            k: v.to(device=self.device)
+            k: v.to(device=self.device, non_blocking=True)
             for k, v in pinned_loss_inputs.items()
         }
 
