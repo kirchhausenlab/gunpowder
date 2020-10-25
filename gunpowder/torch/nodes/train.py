@@ -1,4 +1,3 @@
-
 import logging
 import numpy as np
 
@@ -200,11 +199,12 @@ class Train(GenericTrain):
         requested_outputs = self.__collect_requested_outputs(request)
 
         # keys are argument names of model forward pass
-        device_inputs = {
-            k: torch.as_tensor(
-                v,
-                device=self.device) for k,
+        pinned_inputs = {
+            k: torch.as_tensor(v).pin_memory() for k,
             v in inputs.items()}
+        device_inputs = {
+            k: v.to(device=self.device) for k,
+            v in pinned_inputs.items()}
 
         # get outputs. Keys are tuple indices or model attr names as in
         # self.outputs
@@ -230,9 +230,14 @@ class Train(GenericTrain):
         # Some inputs to the loss should come from the batch, not the model
         provided_loss_inputs = self.__collect_provided_loss_inputs(batch)
 
-        device_loss_inputs = {
-            k: torch.as_tensor(v, device=self.device)
+        pinned_loss_inputs = {
+            k: torch.as_tensor(v).pin_memory()
             for k, v in provided_loss_inputs.items()
+        }
+
+        device_loss_inputs = {
+            k: v.to(device=self.device)
+            for k, v in pinned_loss_inputs.items()
         }
 
         # Some inputs to the loss function should come from the outputs of the model
