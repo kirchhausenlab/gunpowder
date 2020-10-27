@@ -122,7 +122,7 @@ class Snapshot(BatchFilter):
 
             try:
                 os.makedirs(self.output_dir)
-            except:
+            except BaseException:
                 pass
 
             snapshot_name = os.path.join(
@@ -202,7 +202,7 @@ class Snapshot(BatchFilter):
                         compression=self.compression_type,
                     )
 
-                if batch.loss is not None:
-                    f["/"].attrs["loss"] = batch.loss
+                # if batch.loss is not None:
+                    # f["/"].attrs["loss"] = batch.loss
 
         self.n += 1
