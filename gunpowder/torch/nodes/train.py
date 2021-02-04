@@ -74,6 +74,16 @@ class Train(GenericTrain):
         log_every (``int``, optional):
 
             After how many iterations to write out tensorboard summaries.
+
+        device (``string``, optional):
+
+            Which device to use for prediction (``"cpu"`` or ``"cuda"``).
+            Default is ``"cuda"``, which falls back to CPU if CUDA is not
+            available.
+
+        gpus (``list`` of ``int``, optional):
+
+            Which GPUs to use for prediction.
     """
 
     def __init__(
@@ -90,6 +100,8 @@ class Train(GenericTrain):
         save_every: int = 2000,
         log_dir: str = None,
         log_every: int = 1,
+        device="cuda",
+        gpus=[0],
         spawn_subprocess: bool = False,
     ):
 
@@ -115,6 +127,9 @@ class Train(GenericTrain):
         self.loss_inputs = loss_inputs
         self.checkpoint_basename = checkpoint_basename
         self.save_every = save_every
+        self.device_string = device
+        self.device = None
+        self.gpus = gpus
 
         self.iteration = 0
 
@@ -158,8 +173,17 @@ class Train(GenericTrain):
 
     def start(self):
 
-        self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if self.use_cuda else "cpu")
+        self.use_cuda = torch.cuda.is_available() and self.device_string == "cuda"
+        if len(self.gpus) > 1:
+            raise NotImplementedError(f"Training only implemented for a single GPU.")
+        torch.cuda.set_device(self.gpus[0])
+
+        if self.use_cuda:
+            logger.info(f"Training on gpu {torch.cuda.current_device()}.")
+        else:
+            logger.info("Training on cpu.")
+
+        self.device = torch.device(f"cuda:{torch.cuda.current_device()}" if self.use_cuda else "cpu")
 
         try:
             self.model = self.model.to(self.device)
