@@ -293,7 +293,10 @@ class Train(GenericTrain):
         # {device_loss_kwargs}")
 
         loss = self.loss(*device_loss_args, **device_loss_kwargs)
-        loss.backward()
+        if loss.dim() == 1:
+            loss[0].backward()
+        else:
+            loss.backward()
         self.optimizer.step()
 
         if self.summary_writer and batch.iteration % self.log_every == 0:
