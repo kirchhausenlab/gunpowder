@@ -175,7 +175,8 @@ class Train(GenericTrain):
 
         self.use_cuda = torch.cuda.is_available() and self.device_string == "cuda"
         if len(self.gpus) > 1:
-            raise NotImplementedError(f"Training only implemented for a single GPU.")
+            raise NotImplementedError(
+                f"Training only implemented for a single GPU.")
         torch.cuda.set_device(self.gpus[0])
 
         if self.use_cuda:
@@ -183,7 +184,8 @@ class Train(GenericTrain):
         else:
             logger.info("Training on cpu.")
 
-        self.device = torch.device(f"cuda:{torch.cuda.current_device()}" if self.use_cuda else "cpu")
+        self.device = torch.device(
+            f"cuda:{torch.cuda.current_device()}" if self.use_cuda else "cpu")
 
         try:
             self.model = self.model.to(self.device)
@@ -245,11 +247,11 @@ class Train(GenericTrain):
             )
         outputs.update(self.intermediate_layers)
 
-        if self.summary_writer and batch.iteration % self.log_every == 0:
-            self.summary_writer.add_histogram(
-                'model_outputs_channel_0', model_outputs[:, 0, ...], batch.iteration)
-            self.summary_writer.add_histogram(
-                'model_outputs_channel_1', model_outputs[:, 1, ...], batch.iteration)
+        # TODO fix bug for logging histograms
+        # if self.summary_writer and batch.iteration % self.log_every == 0:
+        # for i in model_outputs:
+        # self.summary_writer.add_histogram(
+        # f"model_outputs/{i}", i, batch.iteration)
 
         # Some inputs to the loss should come from the batch, not the model
         provided_loss_inputs = self.__collect_provided_loss_inputs(batch)
@@ -299,22 +301,23 @@ class Train(GenericTrain):
             loss.backward()
         self.optimizer.step()
 
-        if self.summary_writer and batch.iteration % self.log_every == 0:
-            for i, tensor in enumerate(device_loss_args):
-                self.summary_writer.add_histogram(
-                    f'loss_inputs/{i}', tensor, batch.iteration
-                )
+        # TODO fix bug for logging histograms
+        # if self.summary_writer and batch.iteration % self.log_every == 0:
+        # for i, tensor in enumerate(device_loss_args):
+        # self.summary_writer.add_histogram(
+        # f'loss_inputs/{i}', tensor, batch.iteration
+        # )
 
-            for i, p in enumerate(self.model.parameters()):
-                self.summary_writer.add_histogram(
-                    f'weights/{i}', p, batch.iteration
-                )
-                self.summary_writer.add_scalar(
-                    f'gradients_mean/{i}', p.grad.mean(), batch.iteration
-                )
-                self.summary_writer.add_histogram(
-                    f'gradients/{i}', p.grad, batch.iteration
-                )
+        # for i, p in enumerate(self.model.parameters()):
+        # self.summary_writer.add_histogram(
+        # f'weights/{i}', p, batch.iteration
+        # )
+        # self.summary_writer.add_scalar(
+        # f'gradients_mean/{i}', p.grad.mean(), batch.iteration
+        # )
+        # self.summary_writer.add_histogram(
+        # f'gradients/{i}', p.grad, batch.iteration
+        # )
 
         # add requested model outputs to batch
         for array_key, array_name in requested_outputs.items():
@@ -359,8 +362,10 @@ class Train(GenericTrain):
                 checkpoint_name,
             )
 
-        if self.summary_writer and batch.iteration % self.log_every == 0:
-            self.summary_writer.add_scalar("loss", batch.loss, batch.iteration)
+        iterable_loss = np.atleast_1d(batch.loss).tolist()
+        if self.summary_writer:
+            for i, l in enumerate(iterable_loss):
+                self.summary_writer.add_scalar(f"loss_{i}", l, batch.iteration)
 
     def __collect_requested_outputs(self, request):
 
