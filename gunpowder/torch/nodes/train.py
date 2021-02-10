@@ -218,7 +218,6 @@ class Train(GenericTrain):
         logger.info("Using device %s", self.device)
 
     def train_step(self, batch, request):
-        self.iteration += 1
         batch.iteration = self.iteration
 
         inputs = self.__collect_provided_inputs(batch)
@@ -366,6 +365,8 @@ class Train(GenericTrain):
         if self.summary_writer:
             for i, l in enumerate(iterable_loss):
                 self.summary_writer.add_scalar(f"loss_{i}", l, batch.iteration)
+
+        self.iteration += 1
 
     def __collect_requested_outputs(self, request):
 
