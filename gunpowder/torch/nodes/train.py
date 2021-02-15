@@ -177,9 +177,9 @@ class Train(GenericTrain):
         if len(self.gpus) > 1:
             raise NotImplementedError(
                 f"Training only implemented for a single GPU.")
-        torch.cuda.set_device(self.gpus[0])
 
         if self.use_cuda:
+            torch.cuda.set_device(self.gpus[0])
             logger.info(f"Training on gpu {torch.cuda.current_device()}.")
         else:
             logger.info("Training on cpu.")
@@ -224,12 +224,16 @@ class Train(GenericTrain):
         requested_outputs = self.__collect_requested_outputs(request)
 
         # keys are argument names of model forward pass
-        pinned_inputs = {
-            k: torch.as_tensor(v).pin_memory() for k,
-            v in inputs.items()}
-        device_inputs = {
-            k: v.to(device=self.device, non_blocking=True) for k,
-            v in pinned_inputs.items()}
+        if self.use_cuda:
+            pinned_inputs = {
+                k: torch.as_tensor(v).pin_memory() for k,
+                v in inputs.items()}
+            device_inputs = {
+                k: v.to(device=self.device, non_blocking=True) for k,
+                v in pinned_inputs.items()}
+        else:
+            device_inputs = {
+                k: torch.as_tensor(v) for k, v in inputs.items()}
 
         # get outputs. Keys are tuple indices or model attr names as in
         # self.outputs
@@ -255,15 +259,16 @@ class Train(GenericTrain):
         # Some inputs to the loss should come from the batch, not the model
         provided_loss_inputs = self.__collect_provided_loss_inputs(batch)
 
-        pinned_loss_inputs = {
-            k: torch.as_tensor(v).pin_memory()
-            for k, v in provided_loss_inputs.items()
-        }
-
-        device_loss_inputs = {
-            k: v.to(device=self.device, non_blocking=True)
-            for k, v in pinned_loss_inputs.items()
-        }
+        if self.use_cuda:
+            pinned_loss_inputs = {
+                k: torch.as_tensor(v).pin_memory()
+                for k, v in provided_loss_inputs.items()}
+            device_loss_inputs = {
+                k: v.to(device=self.device, non_blocking=True)
+                for k, v in pinned_loss_inputs.items()}
+        else:
+            device_loss_inputs = {
+                k: torch.as_tensor(v) for k, v in provided_loss_inputs.items()}
 
         # Some inputs to the loss function should come from the outputs of the model
         # Update device loss inputs with tensors from outputs if available
